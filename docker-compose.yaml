@@ -12,9 +12,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      
+
   api:
-    build: .
+    build: ./order-service
     container_name: order-service-api
     restart: always
     ports:
@@ -35,4 +35,5 @@ services:
 
 volumes:
   postgres_data:
+
 
