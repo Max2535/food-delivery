@@ -24,6 +24,14 @@ services:
       - DB_URL=postgres://admin:admin@db:5432/order_db?sslmode=disable
     depends_on:
       - db
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 
 volumes:
   postgres_data:
