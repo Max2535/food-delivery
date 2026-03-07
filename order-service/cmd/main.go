@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/Max2535/food-delivery/order-service/internal/handler"
 	"github.com/Max2535/food-delivery/order-service/internal/model"
@@ -34,9 +35,21 @@ func main() {
 		log.Fatal("DB_URL is not set in .env")
 	}
 
-	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	var db *gorm.DB
+	var err error
+	
+	// Retry connection up to 10 times
+	for i := 0; i < 10; i++ {
+		db, err = gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to database (attempt %d/10): %v", i+1, err)
+		time.Sleep(2 * time.Second)
+	}
+
 	if err != nil {
-		log.Fatalf("Failed to connect to repository: %v", err)
+		log.Fatalf("Could not connect to database after retries: %v", err)
 	}
 
 	// Auto Migrate

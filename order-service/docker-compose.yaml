@@ -16,6 +16,7 @@ services:
   api:
     build: .
     container_name: order-service-api
+    restart: always
     ports:
       - "3000:3000"
     environment:

@@ -140,15 +140,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
+                    "description": "GORM จะจัดการค่า CreatedAt และ UpdatedAt ให้โดยอัตโนมัติ",
                     "type": "string"
                 },
                 "customer_id": {
+                    "description": "CustomerID ควรเป็น string (UUID) เพื่อรองรับการเชื่อมโยงกับ Identity Service อื่น",
                     "type": "string"
                 },
                 "id": {
+                    "description": "ใช้ uint เป็น ID ตามมาตรฐาน GORM พร้อมกำหนด auto-increment",
                     "type": "integer"
                 },
                 "status": {
+                    "description": "Status สำหรับทำ State Machine เช่น Pending, Confirmed, Shipped",
                     "type": "string"
                 },
                 "total_amount": {
