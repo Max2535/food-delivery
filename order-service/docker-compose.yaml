@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: order-service-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: order_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      
+  api:
+    build: .
+    container_name: order-service-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DB_URL=postgres://admin:admin@db:5432/order_db?sslmode=disable
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+

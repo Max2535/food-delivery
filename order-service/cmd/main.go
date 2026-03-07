@@ -1,0 +1,72 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"github.com/Max2535/food-delivery/order-service/internal/handler"
+	"github.com/Max2535/food-delivery/order-service/internal/model"
+	"github.com/Max2535/food-delivery/order-service/internal/repository"
+	"github.com/Max2535/food-delivery/order-service/internal/service"
+	_ "github.com/Max2535/food-delivery/order-service/docs" // Swagger docs
+	swagger "github.com/gofiber/swagger"
+	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+// @title Order Service API
+// @version 1.0
+// @description This is the API server for an order service.
+// @host localhost:3000
+// @BasePath /
+
+func main() {
+	// Load .env
+	if err := godotenv.Load(".env"); err != nil {
+		log.Println("Warning: .env file not found")
+	}
+
+	// Database Connection
+	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("DB_URL is not set in .env")
+	}
+
+	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect to repository: %v", err)
+	}
+
+	// Auto Migrate
+	db.AutoMigrate(&model.Order{})
+
+	// Initialize Layers
+	orderRepo := repository.NewOrderRepository(db)
+	orderService := service.NewOrderService(orderRepo)
+	orderHandler := handler.NewOrderHandler(orderService)
+
+	// Fiber Instance
+	app := fiber.New()
+
+	// Swagger route
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
+	// Routes
+	api := app.Group("/api")
+	v1 := api.Group("/v1")
+
+	orders := v1.Group("/orders")
+	orders.Post("/", orderHandler.CreateOrder)
+	orders.Get("/", orderHandler.GetAllOrders)
+	orders.Get("/:id", orderHandler.GetOrderByID)
+
+	// Listen
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+	log.Fatal(app.Listen(":" + port))
+}
