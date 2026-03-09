@@ -5,13 +5,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/Max2535/food-delivery/order-service/internal/handler"
-	"github.com/Max2535/food-delivery/order-service/internal/model"
-	"github.com/Max2535/food-delivery/order-service/internal/repository"
-	"github.com/Max2535/food-delivery/order-service/internal/service"
-	_ "github.com/Max2535/food-delivery/order-service/docs" // Swagger docs
-	swagger "github.com/gofiber/swagger"
+	_ "order-service/docs" // Swagger docs
+	"order-service/internal/handler"
+	"order-service/internal/model"
+	"order-service/internal/repository"
+	"order-service/internal/service"
+
 	"github.com/gofiber/fiber/v2"
+	swagger "github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -37,7 +38,7 @@ func main() {
 
 	var db *gorm.DB
 	var err error
-	
+
 	// Retry connection up to 10 times
 	for i := 0; i < 10; i++ {
 		db, err = gorm.Open(postgres.Open(dbURL), &gorm.Config{})

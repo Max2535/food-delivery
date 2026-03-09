@@ -1,7 +1,8 @@
 package repository
 
 import (
-	"github.com/Max2535/food-delivery/order-service/internal/model"
+	"order-service/internal/model"
+
 	"gorm.io/gorm"
 )
 

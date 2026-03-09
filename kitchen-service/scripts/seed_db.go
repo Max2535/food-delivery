@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"order-service/internal/model"
+	"kitchen-service/internal/model"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -32,46 +32,36 @@ func main() {
 
 	// AutoMigrate the schema
 	log.Println("Migrating database...")
-	if err := db.AutoMigrate(&model.Order{}); err != nil {
+	if err := db.AutoMigrate(&model.KitchenTicket{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// Mock Data
-	orders := []model.Order{
+	tickets := []model.KitchenTicket{
 		{
-			CustomerID:  "CUST001",
-			TotalAmount: 250.50,
-			Status:      "pending",
+			OrderID: 1,
+			Items:   `[{"name": "Pad Thai", "quantity": 1}, {"name": "Tom Yum", "quantity": 1}]`,
+			Status:  "Received",
 		},
 		{
-			CustomerID:  "CUST002",
-			TotalAmount: 120.00,
-			Status:      "completed",
+			OrderID: 2,
+			Items:   `[{"name": "Green Curry", "quantity": 2}]`,
+			Status:  "Cooking",
 		},
 		{
-			CustomerID:  "CUST003",
-			TotalAmount: 50.00,
-			Status:      "cancelled",
-		},
-		{
-			CustomerID:  "CUST001",
-			TotalAmount: 320.75,
-			Status:      "completed",
-		},
-		{
-			CustomerID:  "CUST004",
-			TotalAmount: 450.00,
-			Status:      "preparing",
+			OrderID: 3,
+			Items:   `[{"name": "Mango Sticky Rice", "quantity": 1}]`,
+			Status:  "Ready",
 		},
 	}
 
 	log.Println("Seeding data...")
 
-	for _, order := range orders {
-		if err := db.Create(&order).Error; err != nil {
-			log.Printf("Failed to seed order for %s: %v", order.CustomerID, err)
+	for _, ticket := range tickets {
+		if err := db.Create(&ticket).Error; err != nil {
+			log.Printf("Failed to seed ticket for order %d: %v", ticket.OrderID, err)
 		} else {
-			log.Printf("Seeded order ID %d for customer %s", order.ID, order.CustomerID)
+			log.Printf("Seeded ticket ID %d for order %d", ticket.ID, ticket.OrderID)
 		}
 	}
 
