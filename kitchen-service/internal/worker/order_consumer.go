@@ -68,7 +68,7 @@ func StartOrderConsumer(kitchenSvc service.KitchenService) {
 
 			itemsStr, _ := data["items"].(string)
 
-			log.Printf("Kitchen received new order: %v", orderID)
+			log.Printf("[CorrID: %s] Kitchen received new order: %v", d.CorrelationId, orderID)
 
 			ticket := &model.KitchenTicket{
 				OrderID: orderID,
