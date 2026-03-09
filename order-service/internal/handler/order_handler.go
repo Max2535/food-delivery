@@ -3,8 +3,9 @@ package handler
 import (
 	"strconv"
 
-	"github.com/Max2535/food-delivery/order-service/internal/model"
-	"github.com/Max2535/food-delivery/order-service/internal/service"
+	"order-service/internal/model"
+	"order-service/internal/service"
+
 	"github.com/gofiber/fiber/v2"
 )
 

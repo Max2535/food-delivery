@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/Max2535/food-delivery/order-service/internal/model"
-	"github.com/Max2535/food-delivery/order-service/internal/repository"
+	"order-service/internal/model"
+	"order-service/internal/repository"
 )
 
 type OrderService interface {
