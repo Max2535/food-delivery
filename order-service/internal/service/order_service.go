@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 
 	"order-service/internal/model"
 	"order-service/internal/repository"
 
+	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -65,14 +67,18 @@ func (s *orderService) publishToKitchen(order *model.Order) {
 		"items":    "[]", // TODO: Implement Order Items in Model
 	})
 
+	correlationID := uuid.New().String()
+	log.Printf("Publishing event for order %d with Correlation ID: %s", order.ID, correlationID)
+
 	// 4. Publish Message พร้อม Routing Key
 	ch.PublishWithContext(context.Background(),
 		"order_events",       // exchange
 		"order.created",      // routing key
 		false, false,
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
+			ContentType:   "application/json",
+			CorrelationId: correlationID,
+			Body:          body,
 		})
 }
 

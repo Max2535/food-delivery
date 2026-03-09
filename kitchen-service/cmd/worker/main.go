@@ -140,9 +140,9 @@ func main() {
 					Items:   payload.Items,
 				}
 				if err := kitchenSvc.CreateTicket(ticket); err != nil {
-					log.Printf("Failed to create ticket: %v", err)
+					log.Printf("[CorrID: %s] Failed to create ticket: %v", d.CorrelationId, err)
 				} else {
-					log.Printf("Ticket created for order %d", payload.OrderID)
+					log.Printf("[CorrID: %s] Ticket created for order %d", d.CorrelationId, payload.OrderID)
 				}
 			} else {
 				log.Printf("Error unmarshalling event string: %v", err)
