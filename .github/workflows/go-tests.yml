@@ -1,0 +1,48 @@
+name: Go Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test-order-service:
+    name: Order Service Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Download dependencies
+        working-directory: order-service
+        run: go mod download
+
+      - name: Run tests
+        working-directory: order-service
+        run: go test ./internal/... -v -count=1
+
+  test-kitchen-service:
+    name: Kitchen Service Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Download dependencies
+        working-directory: kitchen-service
+        run: go mod download
+
+      - name: Run tests
+        working-directory: kitchen-service
+        run: go test ./internal/... -v -count=1
