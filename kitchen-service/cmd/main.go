@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	consul "github.com/hashicorp/consul/api"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
@@ -39,9 +40,47 @@ func main() {
     app := fiber.New()
 
     // 3. Routes
+    app.Get("/health", func(c *fiber.Ctx) error {
+        return c.SendString("OK")
+    })
+
     api := app.Group("/api/v1/kitchen")
     api.Post("/tickets", hdl.CreateTicket)       // รับ Order จาก Order Service
     api.Patch("/tickets/:orderId", hdl.UpdateStatus) // อัปเดตเมื่อทำเสร็จ
 
+    // 4. Register with Consul
+    registerWithConsul()
+
     app.Listen(":3001")
+}
+
+func registerWithConsul() {
+    config := consul.DefaultConfig()
+    client, err := consul.NewClient(config)
+    if err != nil {
+        log.Printf("Error creating consul client: %v", err)
+        return
+    }
+
+    address := "localhost"
+    if envAddr := os.Getenv("SERVICE_ADDRESS"); envAddr != "" {
+        address = envAddr
+    }
+
+    registration := &consul.AgentServiceRegistration{
+        ID:      "kitchen-service-1",
+        Name:    "kitchen-service",
+        Port:    3001,
+        Address: address,
+        Check: &consul.AgentServiceCheck{
+            HTTP:     "http://" + address + ":3001/health",
+            Interval: "10s",
+        },
+    }
+    
+    if err := client.Agent().ServiceRegister(registration); err != nil {
+        log.Printf("Error registering service: %v", err)
+    } else {
+        log.Println("Successfully registered kitchen-service with Consul")
+    }
 }
