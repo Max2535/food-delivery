@@ -38,9 +38,12 @@ services:
       - PORT=3001
       - DB_URL=postgres://admin:admin@db:5432/kitchen_db?sslmode=disable
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - CONSUL_ADDRESS=consul:8500
+      - SERVICE_ADDRESS=kitchen-api
     depends_on:
       - db
       - rabbitmq
+      - consul
     command: ["./api"]
 
   kitchen-worker:
