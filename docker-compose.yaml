@@ -63,6 +63,15 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+  consul:
+    image: hashicorp/consul:latest
+    container_name: consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    command: "agent -dev -client=0.0.0.0"
+
 volumes:
   postgres_data:
 
