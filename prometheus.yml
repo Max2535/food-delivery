@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service-api:3000']
+
+  - job_name: 'kitchen-service'
+    static_configs:
+      - targets: ['kitchen-service-api:3001']
+
