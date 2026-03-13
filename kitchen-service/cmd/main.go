@@ -7,6 +7,7 @@ import (
     "kitchen-service/internal/service"
     "kitchen-service/internal/worker"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	consul "github.com/hashicorp/consul/api"
@@ -38,6 +39,11 @@ func main() {
     hdl := handler.NewKitchenHandler(svc)
 
     app := fiber.New()
+
+    // Setup Prometheus
+    prometheus := fiberprometheus.New("kitchen-service")
+    prometheus.RegisterAt(app, "/metrics")
+    app.Use(prometheus.Middleware)
 
     // 3. Routes
     app.Get("/health", func(c *fiber.Ctx) error {
