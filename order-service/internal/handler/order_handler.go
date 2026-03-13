@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"order-service/internal/model"
 	"order-service/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 )
 
 type OrderHandler struct {
@@ -38,6 +40,17 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	correlationID := c.Get("X-Correlation-ID")
+	if correlationID == "" {
+		correlationID = "unknown"
+	}
+
+	log.Info().
+		Str("service", "order-service").
+		Str("order_id", fmt.Sprint(order.ID)).
+		Str("correlation_id", correlationID). // สำคัญมากสำหรับการแกะรอย
+		Msg("Order created successfully")
+
 	return c.Status(fiber.StatusCreated).JSON(order)
 }
 
@@ -52,8 +65,17 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 	orders, err := h.service.GetAllOrders()
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get all orders")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	correlationID := c.Get("X-Correlation-ID", "unknown")
+	log.Info().
+		Str("service", "order-service").
+		Str("correlation_id", correlationID).
+		Int("count", len(orders)).
+		Msg("Fetched all orders")
+
 	return c.JSON(orders)
 }
 
@@ -70,13 +92,22 @@ func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
+		log.Warn().Err(err).Str("id", c.Params("id")).Msg("Invalid order ID format")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
 	}
 
 	order, err := h.service.GetOrderByID(uint(id))
 	if err != nil {
+		log.Warn().Err(err).Int("id", id).Msg("Order not found")
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Order not found"})
 	}
+
+	correlationID := c.Get("X-Correlation-ID", "unknown")
+	log.Info().
+		Str("service", "order-service").
+		Str("correlation_id", correlationID).
+		Int("order_id", id).
+		Msg("Fetched order by ID")
 
 	return c.JSON(order)
 }

@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/rs/zerolog/log"
 
 	"kitchen-service/internal/model"
 	"kitchen-service/internal/repository"
@@ -20,18 +21,18 @@ import (
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Println("Warning: .env file not found")
+		log.Warn().Msg("Warning: .env file not found")
 	}
 
 	// 1. Database Connection (Kitchen DB)
 	dsn := os.Getenv("DB_URL")
 	if dsn == "" {
-		log.Fatal("DB_URL is not set")
+		log.Fatal().Msg("DB_URL is not set")
 	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to Kitchen DB: %v", err)
+		log.Fatal().Err(err).Msg("Failed to connect to Kitchen DB")
 	}
 
 	// Auto Migrate
@@ -48,13 +49,13 @@ func main() {
 	}
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("Failed to open a channel: %v", err)
+		log.Fatal().Err(err).Msg("Failed to open a channel")
 	}
 	defer ch.Close()
 
@@ -69,7 +70,7 @@ func main() {
 		nil,            // arguments
 	)
 	if err != nil {
-		log.Fatalf("Failed to declare an exchange: %v", err)
+		log.Fatal().Err(err).Msg("Failed to declare an exchange")
 	}
 
 	q, err := ch.QueueDeclare(
@@ -81,7 +82,7 @@ func main() {
 		nil,                   // arguments
 	)
 	if err != nil {
-		log.Fatalf("Failed to declare a queue: %v", err)
+		log.Fatal().Err(err).Msg("Failed to declare a queue")
 	}
 
 	err = ch.QueueBind(
@@ -92,7 +93,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		log.Fatalf("Failed to bind a queue: %v", err)
+		log.Fatal().Err(err).Msg("Failed to bind a queue")
 	}
 
 	msgs, err := ch.Consume(
@@ -105,7 +106,7 @@ func main() {
 		nil,    // args
 	)
 	if err != nil {
-		log.Fatalf("Failed to register a consumer: %v", err)
+		log.Fatal().Err(err).Msg("Failed to register a consumer")
 	}
 
 	// 5. Build worker context avoiding rapid termination
@@ -117,18 +118,18 @@ func main() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 		<-stop
-		log.Println("Shutting down worker...")
+		log.Info().Str("service", "kitchen-worker").Msg("Shutting down worker...")
 		cancel()
 	}()
 
-	log.Printf(" [*] Waiting for logs. To exit press CTRL+C")
+	log.Info().Str("service", "kitchen-worker").Msg(" [*] Waiting for logs. To exit press CTRL+C")
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case d := <-msgs:
-			log.Printf(" [x] Received %s", d.Body)
+			log.Info().Str("service", "kitchen-worker").Msgf(" [x] Received %s", d.Body)
 			var payload struct {
 				OrderID uint   `json:"order_id"`
 				Items   string `json:"items"`
@@ -139,13 +140,18 @@ func main() {
 					OrderID: payload.OrderID,
 					Items:   payload.Items,
 				}
+				correlationID := d.CorrelationId
+				if correlationID == "" {
+					correlationID = "unknown"
+				}
+
 				if err := kitchenSvc.CreateTicket(ticket); err != nil {
-					log.Printf("[CorrID: %s] Failed to create ticket: %v", d.CorrelationId, err)
+					log.Error().Err(err).Str("correlation_id", correlationID).Msg("Failed to create ticket")
 				} else {
-					log.Printf("[CorrID: %s] Ticket created for order %d", d.CorrelationId, payload.OrderID)
+					log.Info().Str("correlation_id", correlationID).Uint("order_id", payload.OrderID).Msg("Ticket created for order")
 				}
 			} else {
-				log.Printf("Error unmarshalling event string: %v", err)
+				log.Error().Err(err).Msg("Error unmarshalling event string")
 			}
 		}
 	}

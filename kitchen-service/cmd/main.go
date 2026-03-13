@@ -9,17 +9,17 @@ import (
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/joho/godotenv"
 	consul "github.com/hashicorp/consul/api"
+	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"log"
 	"os"
 )
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Println("Warning: .env file not found")
+		log.Warn().Msg("Warning: .env file not found")
 	}
 
 	// 1. Database Connection (Kitchen DB)
@@ -69,7 +69,7 @@ func registerWithConsul() {
     config := consul.DefaultConfig()
     client, err := consul.NewClient(config)
     if err != nil {
-        log.Printf("Error creating consul client: %v", err)
+        log.Error().Err(err).Msg("Error creating consul client")
         return
     }
 
@@ -90,8 +90,8 @@ func registerWithConsul() {
     }
     
     if err := client.Agent().ServiceRegister(registration); err != nil {
-        log.Printf("Error registering service: %v", err)
+        log.Error().Err(err).Msg("Error registering service")
     } else {
-        log.Println("Successfully registered kitchen-service with Consul")
+        log.Info().Str("service", "kitchen-service").Msg("Successfully registered kitchen-service with Consul")
     }
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	consul "github.com/hashicorp/consul/api"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 	"github.com/sony/gobreaker"
 )
 
@@ -104,7 +104,11 @@ func (s *orderService) publishToKitchen(order *model.Order) error {
 	})
 
 	correlationID := uuid.New().String()
-	log.Printf("Publishing event for order %d with Correlation ID: %s", order.ID, correlationID)
+	log.Info().
+		Str("service", "order-service").
+		Uint("order_id", order.ID).
+		Str("correlation_id", correlationID).
+		Msg("Publishing event for order")
 
 	// 4. Publish Message พร้อม Routing Key
 	return ch.PublishWithContext(context.Background(),
@@ -135,14 +139,14 @@ func getKitchenServiceAddress() string {
     
     client, err := consul.NewClient(config)
     if err != nil {
-        log.Printf("Error creating consul client: %v", err)
+        log.Error().Err(err).Msg("Error creating consul client")
         return ""
     }
 
     // ถามหาบริการที่ชื่อ kitchen-service
     services, _, err := client.Health().Service("kitchen-service", "", true, nil)
     if err != nil {
-        log.Printf("Error discovering kitchen-service: %v", err)
+        log.Error().Err(err).Msg("Error discovering kitchen-service")
         return ""
     }
     
@@ -150,11 +154,11 @@ func getKitchenServiceAddress() string {
         addr := services[0].Service.Address
         port := services[0].Service.Port
         address := fmt.Sprintf("http://%s:%d", addr, port)
-        log.Printf("Discovered kitchen-service at: %s", address)
+        log.Info().Str("service", "order-service").Str("address", address).Msg("Discovered kitchen-service")
         return address
     }
     
-    log.Println("kitchen-service not found in Consul")
+    log.Warn().Str("service", "order-service").Msg("kitchen-service not found in Consul")
     return ""
 }
 

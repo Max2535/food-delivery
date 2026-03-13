@@ -3,7 +3,8 @@ package service
 import (
     "kitchen-service/internal/model"
     "kitchen-service/internal/repository"
-    "log"
+
+    "github.com/rs/zerolog/log"
 )
 
 type KitchenService interface {
@@ -29,7 +30,7 @@ func (s *kitchenService) UpdateStatus(orderID uint, status string) error {
     err := s.repo.UpdateStatus(orderID, status)
     if err == nil && status == "Ready" {
         // เมื่อทำเสร็จ ให้เรียกฟังก์ชัน Publish Event ไปยัง RabbitMQ
-        log.Printf("Order %d is Ready! Publishing event...", orderID)
+        log.Info().Str("service", "kitchen-service").Uint("order_id", orderID).Msg("Order is Ready! Publishing event...")
         // PublishOrderReadyEvent(orderID) <- ฟังก์ชันที่เขียนค้างไว้คราวก่อน
     }
     return err
