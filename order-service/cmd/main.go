@@ -11,6 +11,7 @@ import (
 	"order-service/internal/repository"
 	"order-service/internal/service"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	swagger "github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
@@ -63,6 +64,11 @@ func main() {
 
 	// Fiber Instance
 	app := fiber.New()
+
+	// Setup Prometheus
+	prometheus := fiberprometheus.New("order-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 
 	// Swagger route
 	app.Get("/swagger/*", swagger.HandlerDefault)
