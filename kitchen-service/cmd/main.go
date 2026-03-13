@@ -40,10 +40,15 @@ func main() {
 
     app := fiber.New()
 
-    // Setup Prometheus
-    prometheus := fiberprometheus.New("kitchen-service")
-    prometheus.RegisterAt(app, "/metrics")
-    app.Use(prometheus.Middleware)
+    // 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ
+    prome := fiberprometheus.NewWithDefaultRegistry("kitchen-service")
+
+    // 2. ลงทะเบียน Middleware เข้ากับ Fiber
+    app.Use(prome.Middleware)
+
+    // 3.Newman Tip: แทนที่จะให้มันสร้าง Registry เอง
+    // เราจะใช้ Default ของ Prometheus ที่รวม Go Metrics ไว้แล้ว
+    prome.RegisterAt(app, "/metrics")
 
     // 3. Routes
     app.Get("/health", func(c *fiber.Ctx) error {

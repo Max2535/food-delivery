@@ -65,10 +65,15 @@ func main() {
 	// Fiber Instance
 	app := fiber.New()
 
-	// Setup Prometheus
-	prometheus := fiberprometheus.New("order-service")
-	prometheus.RegisterAt(app, "/metrics")
-	app.Use(prometheus.Middleware)
+	// 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ
+	prome := fiberprometheus.NewWithDefaultRegistry("order-service")
+
+	// 2. ลงทะเบียน Middleware เข้ากับ Fiber
+	app.Use(prome.Middleware)
+
+	// 3.Newman Tip: แทนที่จะให้มันสร้าง Registry เอง
+	// เราจะใช้ Default ของ Prometheus ที่รวม Go Metrics ไว้แล้ว
+	prome.RegisterAt(app, "/metrics")
 
 	// Swagger route
 	app.Get("/swagger/*", swagger.HandlerDefault)
