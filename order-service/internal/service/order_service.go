@@ -12,6 +12,7 @@ import (
 	"order-service/internal/repository"
 
 	"github.com/google/uuid"
+	consul "github.com/hashicorp/consul/api"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/sony/gobreaker"
 )
@@ -124,3 +125,36 @@ func (s *orderService) GetAllOrders() ([]model.Order, error) {
 func (s *orderService) GetOrderByID(id uint) (*model.Order, error) {
 	return s.repo.FindByID(id)
 }
+
+func getKitchenServiceAddress() string {
+    config := consul.DefaultConfig()
+    // Config consul address if needed, default is localhost:8500
+    if consulAddr := os.Getenv("CONSUL_ADDRESS"); consulAddr != "" {
+        config.Address = consulAddr
+    }
+    
+    client, err := consul.NewClient(config)
+    if err != nil {
+        log.Printf("Error creating consul client: %v", err)
+        return ""
+    }
+
+    // ถามหาบริการที่ชื่อ kitchen-service
+    services, _, err := client.Health().Service("kitchen-service", "", true, nil)
+    if err != nil {
+        log.Printf("Error discovering kitchen-service: %v", err)
+        return ""
+    }
+    
+    if len(services) > 0 {
+        addr := services[0].Service.Address
+        port := services[0].Service.Port
+        address := fmt.Sprintf("http://%s:%d", addr, port)
+        log.Printf("Discovered kitchen-service at: %s", address)
+        return address
+    }
+    
+    log.Println("kitchen-service not found in Consul")
+    return ""
+}
+
