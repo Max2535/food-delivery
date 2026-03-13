@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"kitchen-service/internal/model"
 	"kitchen-service/internal/service"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 )
 
 type KitchenHandler struct {
@@ -30,6 +32,17 @@ func (h *KitchenHandler) CreateTicket(c *fiber.Ctx) error {
 			"error": "ไม่สามารถสร้างรายการในครัวได้",
 		})
 	}
+
+	correlationID := c.Get("X-Correlation-ID")
+	if correlationID == "" {
+		correlationID = "unknown"
+	}
+
+	log.Info().
+		Str("service", "kitchen-service").
+		Str("order_id", fmt.Sprint(ticket.OrderID)).
+		Str("correlation_id", correlationID). // สำคัญมากสำหรับการแกะรอย
+		Msg("Ticket created successfully")
 
 	return c.Status(fiber.StatusCreated).JSON(ticket)
 }
@@ -58,10 +71,19 @@ func (h *KitchenHandler) UpdateStatus(c *fiber.Ctx) error {
 
 	// เรียก Service เพื่ออัปเดต DB และส่ง Event ไป RabbitMQ (ถ้า status == Ready)
 	if err := h.service.UpdateStatus(uint(orderID), req.Status); err != nil {
+		log.Error().Err(err).Uint64("order_id", orderID).Str("status", req.Status).Msg("Failed to update ticket status")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "ไม่สามารถอัปเดตสถานะได้",
 		})
 	}
+
+	correlationID := c.Get("X-Correlation-ID", "unknown")
+	log.Info().
+		Str("service", "kitchen-service").
+		Str("correlation_id", correlationID).
+		Uint64("order_id", orderID).
+		Str("status", req.Status).
+		Msg("Ticket status updated")
 
 	return c.JSON(fiber.Map{
 		"message": "อัปเดตสถานะเรียบร้อยแล้ว",

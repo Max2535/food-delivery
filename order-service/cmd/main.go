@@ -1,9 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	_ "order-service/docs" // Swagger docs
 	"order-service/internal/handler"
@@ -28,13 +29,13 @@ import (
 func main() {
 	// Load .env
 	if err := godotenv.Load(".env"); err != nil {
-		log.Println("Warning: .env file not found")
+		log.Warn().Msg("Warning: .env file not found")
 	}
 
 	// Database Connection
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
-		log.Fatal("DB_URL is not set in .env")
+		log.Fatal().Msg("DB_URL is not set in .env")
 	}
 
 	var db *gorm.DB
@@ -46,12 +47,12 @@ func main() {
 		if err == nil {
 			break
 		}
-		log.Printf("Failed to connect to database (attempt %d/10): %v", i+1, err)
+		log.Warn().Err(err).Int("attempt", i+1).Msg("Failed to connect to database")
 		time.Sleep(2 * time.Second)
 	}
 
 	if err != nil {
-		log.Fatalf("Could not connect to database after retries: %v", err)
+		log.Fatal().Err(err).Msg("Could not connect to database after retries")
 	}
 
 	// Auto Migrate
@@ -93,5 +94,5 @@ func main() {
 		port = "3000"
 	}
 
-	log.Fatal(app.Listen(":" + port))
+	log.Fatal().Err(app.Listen(":" + port)).Msg("Server failed")
 }
