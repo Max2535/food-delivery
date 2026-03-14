@@ -8,6 +8,7 @@ import (
 
 	_ "order-service/docs" // Swagger docs
 	"order-service/internal/handler"
+	"order-service/internal/middleware"
 	"order-service/internal/model"
 	"order-service/internal/repository"
 	"order-service/internal/service"
@@ -65,6 +66,9 @@ func main() {
 
 	// Fiber Instance
 	app := fiber.New()
+
+	// Global Middleware
+	app.Use(middleware.LoggerMiddleware())
 
 	// 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ
 	prome := fiberprometheus.NewWithDefaultRegistry("order-service")
