@@ -32,6 +32,26 @@
           "host": ["http://kitchen-service-api:3001"]
         }
       ]
+    },
+    {
+      "endpoint": "/v1/auth/login",
+      "method": "POST",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/auth/login",
+          "host": ["http://auth-service:3002"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/auth/register",
+      "method": "POST",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/auth/register",
+          "host": ["http://auth-service:3002"]
+        }
+      ]
     }
   ]
 }
