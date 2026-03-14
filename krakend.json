@@ -2,6 +2,16 @@
   "version": 3,
   "port": 8080,
   "timeout": "3s",
+  "extra_config": {
+    "telemetry/metrics": {
+      "collection_time": "30s",
+      "proxy_disabled": false,
+      "router_disabled": false,
+      "backend_disabled": false,
+      "endpoint_disabled": false,
+      "listen_address": ":9091"
+    }
+  },
   "endpoints": [
     {
       "endpoint": "/v1/orders",
