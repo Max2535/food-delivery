@@ -53,9 +53,19 @@ func (s *authService) Login(req model.LoginRequest) (*model.LoginResponse, error
 }
 
 func (s *authService) generateToken(user *model.User) (string, error) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "default_secret" // In production, this should be set
+	keyPath := os.Getenv("PRIVATE_KEY_PATH")
+	if keyPath == "" {
+		keyPath = "private_key.pem"
+	}
+
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", err
+	}
+
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyData)
+	if err != nil {
+		return "", err
 	}
 
 	claims := jwt.MapClaims{
@@ -64,6 +74,7 @@ func (s *authService) generateToken(user *model.User) (string, error) {
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(jwtSecret))
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = "default"
+	return token.SignedString(privateKey)
 }

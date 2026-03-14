@@ -120,7 +120,9 @@ services:
     environment:
       - PORT=3002
       - DB_URL=postgres://admin:admin@db:5432/auth_db?sslmode=disable
-      - JWT_SECRET=supersecretkey
+      - PRIVATE_KEY_PATH=/app/private_key.pem
+    volumes:
+      - ./private_key.pem:/app/private_key.pem
     depends_on:
       - db
 
@@ -129,6 +131,8 @@ services:
     container_name: api-gateway
     volumes:
       - ./krakend.json:/etc/krakend/krakend.json
+      - ./public_key.pem:/etc/krakend/public_key.pem
+      - ./public_key.json:/etc/krakend/public_key.json
     ports:
       - "8080:8080"
       - "9091:9091"
