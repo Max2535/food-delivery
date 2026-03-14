@@ -23,8 +23,8 @@ type MockOrderService struct {
 	mock.Mock
 }
 
-func (m *MockOrderService) CreateOrder(order *model.Order) error {
-	args := m.Called(order)
+func (m *MockOrderService) CreateOrder(order *model.Order, correlationID string) error {
+	args := m.Called(order, correlationID)
 	return args.Error(0)
 }
 
@@ -59,7 +59,7 @@ func TestCreateOrder_Success(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order")).Return(nil)
+	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order"), mock.AnythingOfType("string")).Return(nil)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"customer_id":  "CUST001",
@@ -92,7 +92,7 @@ func TestCreateOrder_ServiceError(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order")).Return(errors.New("db error"))
+	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order"), mock.AnythingOfType("string")).Return(errors.New("db error"))
 
 	body, _ := json.Marshal(map[string]interface{}{"customer_id": "CUST002"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders/", bytes.NewReader(body))

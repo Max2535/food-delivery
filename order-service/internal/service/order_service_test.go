@@ -46,7 +46,7 @@ func TestCreateOrder_SetsDefaultStatus(t *testing.T) {
 	// Expect Create to be called with the order, return nil error
 	mockRepo.On("Create", order).Return(nil)
 
-	err := svc.CreateOrder(order)
+	err := svc.CreateOrder(order, "test-correlation-id")
 
 	if err != nil {
 		assert.Contains(t, err.Error(), "Kitchen service is unavailable")
@@ -64,7 +64,7 @@ func TestCreateOrder_PreservesExistingStatus(t *testing.T) {
 	order := &model.Order{CustomerID: "CUST002", TotalAmount: 200, Status: "confirmed"}
 	mockRepo.On("Create", order).Return(nil)
 
-	err := svc.CreateOrder(order)
+	err := svc.CreateOrder(order, "test-correlation-id")
 
 	if err != nil {
 		assert.Contains(t, err.Error(), "Kitchen service is unavailable")
@@ -82,7 +82,7 @@ func TestCreateOrder_ReturnsError(t *testing.T) {
 	order := &model.Order{CustomerID: "CUST003"}
 	mockRepo.On("Create", order).Return(errors.New("db error"))
 
-	err := svc.CreateOrder(order)
+	err := svc.CreateOrder(order, "test-correlation-id")
 
 	assert.Error(t, err)
 	assert.Equal(t, "db error", err.Error())

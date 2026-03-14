@@ -10,3 +10,6 @@ scrape_configs:
     static_configs:
       - targets: ['kitchen-service-api:3001']
 
+  - job_name: 'krakend'
+    static_configs:
+      - targets: ['api-gateway:9091']

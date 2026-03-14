@@ -10,7 +10,6 @@ import (
 	"order-service/internal/model"
 	"order-service/internal/repository"
 
-	"github.com/google/uuid"
 	consul "github.com/hashicorp/consul/api"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
@@ -34,7 +33,7 @@ func init() {
 }
 
 type OrderService interface {
-	CreateOrder(order *model.Order) error
+	CreateOrder(order *model.Order, correlationID string) error
 	GetAllOrders() ([]model.Order, error)
 	GetOrderByID(id uint) (*model.Order, error)
 }
@@ -47,7 +46,7 @@ func NewOrderService(repo repository.OrderRepository) OrderService {
 	return &orderService{repo: repo}
 }
 
-func (s *orderService) CreateOrder(order *model.Order) error {
+func (s *orderService) CreateOrder(order *model.Order, correlationID string) error {
 	// Add business logic here (e.g., validation, calculating total)
 	if order.Status == "" {
 		order.Status = "pending"
@@ -61,7 +60,7 @@ func (s *orderService) CreateOrder(order *model.Order) error {
 	// หุ้มส่วนที่คุยกับ Kitchen ด้วย Circuit Breaker
 	_, err = cb.Execute(func() (interface{}, error) {
 		// โค้ดที่ยิง HTTP หรือ RabbitMQ ไปหา Kitchen
-		return nil, s.publishToKitchen(order)
+		return nil, s.publishToKitchen(order, correlationID)
 	})
 
 	if err != nil {
@@ -73,7 +72,7 @@ func (s *orderService) CreateOrder(order *model.Order) error {
 	return nil
 }
 
-func (s *orderService) publishToKitchen(order *model.Order) error {
+func (s *orderService) publishToKitchen(order *model.Order, correlationID string) error {
 	// 1. เชื่อมต่อ RabbitMQ
 	rabbitURL := os.Getenv("RABBITMQ_URL")
 	if rabbitURL == "" {
@@ -103,7 +102,7 @@ func (s *orderService) publishToKitchen(order *model.Order) error {
 		"items":    "[]", // TODO: Implement Order Items in Model
 	})
 
-	correlationID := uuid.New().String()
+	// ใช้ correlationID ที่รับมาจาก Gateway แทนการสร้างใหม่
 	log.Info().
 		Str("service", "order-service").
 		Uint("order_id", order.ID).
@@ -117,7 +116,7 @@ func (s *orderService) publishToKitchen(order *model.Order) error {
 		false, false,
 		amqp.Publishing{
 			ContentType:   "application/json",
-			CorrelationId: correlationID,
+			CorrelationId: correlationID, // ✅ ใช้ ID เดิมจาก Gateway
 			Body:          body,
 		})
 }

@@ -36,19 +36,16 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
 	}
 
-	if err := h.service.CreateOrder(order); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
+	correlationID, _ := c.Locals("correlationID").(string)
 
-	correlationID := c.Get("X-Correlation-ID")
-	if correlationID == "" {
-		correlationID = "unknown"
+	if err := h.service.CreateOrder(order, correlationID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	log.Info().
 		Str("service", "order-service").
 		Str("order_id", fmt.Sprint(order.ID)).
-		Str("correlation_id", correlationID). // สำคัญมากสำหรับการแกะรอย
+		Str("correlation_id", correlationID).
 		Msg("Order created successfully")
 
 	return c.Status(fiber.StatusCreated).JSON(order)
@@ -69,7 +66,7 @@ func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	correlationID := c.Get("X-Correlation-ID", "unknown")
+	correlationID, _ := c.Locals("correlationID").(string)
 	log.Info().
 		Str("service", "order-service").
 		Str("correlation_id", correlationID).
@@ -102,7 +99,7 @@ func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Order not found"})
 	}
 
-	correlationID := c.Get("X-Correlation-ID", "unknown")
+	correlationID, _ := c.Locals("correlationID").(string)
 	log.Info().
 		Str("service", "order-service").
 		Str("correlation_id", correlationID).
