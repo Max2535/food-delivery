@@ -27,9 +27,11 @@
           "alg": "RS256",
           "jwk_local_path": "/etc/krakend/public_key.json",
           "jwk_url": "http://localhost:8080",
+          "roles": ["user", "admin"],
           "disable_jwk_security": true,
           "propagate_claims": [
-            ["user_id", "X-User-Id"]
+            ["user_id", "X-User-Id"],
+            ["roles", "X-User-Roles"]
           ]
         }
       },
