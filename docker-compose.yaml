@@ -110,5 +110,16 @@ services:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
 
+  gateway:
+    image: devopsfaith/krakend:latest
+    container_name: api-gateway
+    volumes:
+      - ./krakend.json:/etc/krakend/krakend.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+      - kitchen-api
+
 volumes:
   postgres_data:
