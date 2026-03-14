@@ -110,6 +110,19 @@ services:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
 
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service-api
+    restart: always
+    ports:
+      - "3005:3002"
+    environment:
+      - PORT=3002
+      - DB_URL=postgres://admin:admin@db:5432/auth_db?sslmode=disable
+      - JWT_SECRET=supersecretkey
+    depends_on:
+      - db
+
   gateway:
     image: krakend:latest
     container_name: api-gateway
@@ -121,6 +134,7 @@ services:
     depends_on:
       - api
       - kitchen-api
+      - auth-service
 
   krakend-designer:
     image: devopsfaith/krakendesigner:latest
