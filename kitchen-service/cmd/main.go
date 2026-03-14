@@ -2,7 +2,8 @@ package main
 
 import (
     "kitchen-service/internal/handler"
-    "kitchen-service/internal/model"
+	"kitchen-service/internal/middleware"
+	"kitchen-service/internal/model"
     "kitchen-service/internal/repository"
     "kitchen-service/internal/service"
     "kitchen-service/internal/worker"
@@ -39,6 +40,9 @@ func main() {
     hdl := handler.NewKitchenHandler(svc)
 
     app := fiber.New()
+
+	// Global Middleware
+	app.Use(middleware.LoggerMiddleware())
 
     // 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ
     prome := fiberprometheus.NewWithDefaultRegistry("kitchen-service")
