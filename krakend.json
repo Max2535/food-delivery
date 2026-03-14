@@ -1,0 +1,27 @@
+{
+  "version": 3,
+  "port": 8080,
+  "timeout": "3s",
+  "endpoints": [
+    {
+      "endpoint": "/v1/orders",
+      "method": "POST",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/orders",
+          "host": ["http://order-service-api:3000"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/kitchen/status/{id}",
+      "method": "GET",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/kitchen/orders/{id}",
+          "host": ["http://kitchen-service-api:3001"]
+        }
+      ]
+    }
+  ]
+}
