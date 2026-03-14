@@ -68,9 +68,15 @@ func (s *authService) generateToken(user *model.User) (string, error) {
 		return "", err
 	}
 
+	role := user.Role
+	if role == "" {
+		role = "user"
+	}
+
 	claims := jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
+		"roles":    []string{role},
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	}
 
