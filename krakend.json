@@ -263,6 +263,180 @@
       ]
     },
     {
+      "endpoint": "/v1/catalog/menus/{id}/choices",
+      "method": "GET",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/choices",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/choices",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/choices",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}",
+      "method": "DELETE",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/choices/{group_id}",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}/options",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/choices/{group_id}/options",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}/options/{option_id}",
+      "method": "DELETE",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/choices/{group_id}/options/{option_id}",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/addons",
+      "method": "GET",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/addons",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/addons",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/addons",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/addons/{addon_id}",
+      "method": "DELETE",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/addons/{addon_id}",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/portions",
+      "method": "GET",
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/portions",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/portions",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/portions",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/catalog/menus/{id}/portions/{portion_id}",
+      "method": "DELETE",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [["user_id", "X-User-Id"]]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/catalog/menus/{id}/portions/{portion_id}",
+          "host": ["http://catalog-service-api:3003"]
+        }
+      ]
+    },
+    {
       "endpoint": "/v1/auth/login",
       "method": "POST",
       "backend": [
