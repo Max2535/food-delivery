@@ -73,6 +73,11 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to declare an exchange")
 	}
 
+	// Declare kitchen_events exchange for publishing downstream events to Inventory Worker
+	if err = ch.ExchangeDeclare("kitchen_events", "topic", true, false, false, false, nil); err != nil {
+		log.Fatal().Err(err).Msg("Failed to declare kitchen_events exchange")
+	}
+
 	q, err := ch.QueueDeclare(
 		"kitchen_order_queue", // name
 		true,                  // durable
@@ -135,7 +140,6 @@ func main() {
 				Items   string `json:"items"`
 			}
 			if err := json.Unmarshal(d.Body, &payload); err == nil {
-				// Translate event into new kitchen ticket
 				ticket := &model.KitchenTicket{
 					OrderID: payload.OrderID,
 					Items:   payload.Items,
@@ -149,6 +153,27 @@ func main() {
 					log.Error().Err(err).Str("correlation_id", correlationID).Msg("Failed to create ticket")
 				} else {
 					log.Info().Str("correlation_id", correlationID).Uint("order_id", payload.OrderID).Msg("Ticket created for order")
+
+					// Publish kitchen.ticket_created so Inventory Worker can deduct stock
+					eventBody, _ := json.Marshal(map[string]interface{}{
+						"order_id":  ticket.OrderID,
+						"ticket_id": ticket.ID,
+						"items":     ticket.Items, // forwards order items (currently "[]"; populated when Order Service adds item data)
+					})
+					if pubErr := ch.Publish(
+						"kitchen_events",
+						"kitchen.ticket_created",
+						false, false,
+						amqp.Publishing{
+							ContentType:   "application/json",
+							Body:          eventBody,
+							CorrelationId: correlationID,
+						},
+					); pubErr != nil {
+						log.Error().Err(pubErr).Str("correlation_id", correlationID).Msg("Failed to publish kitchen.ticket_created")
+					} else {
+						log.Info().Str("correlation_id", correlationID).Uint("ticket_id", ticket.ID).Msg("Published kitchen.ticket_created")
+					}
 				}
 			} else {
 				log.Error().Err(err).Msg("Error unmarshalling event string")

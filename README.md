@@ -28,9 +28,14 @@ KrakenD API Gateway (port 8080)
   │      └── Kitchen Worker ◄────────────────────────────┘
   │            └── Consumes order.created events
   │
-  └──► Catalog Service (port 3003)
-         ├── PostgreSQL (catalog_db)
-         └── Redis (caching)
+  ├──► Catalog Service (port 3003)
+  │      ├── PostgreSQL (catalog_db)
+  │      └── Redis (caching)
+  │
+  └──► Inventory Service (port 3004)
+         ├── PostgreSQL (inventory_db)
+         ├── HTTP client → Catalog Service (BOM lookup)
+         └── Inventory Worker ◄── kitchen.ticket_created ◄── Kitchen Worker
 
 Observability:
   Prometheus (9090) ◄── scrapes all services
@@ -52,6 +57,8 @@ Observability:
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
 | Catalog Service | 3003 | Master data: menus, BOM, add-ons, portions, stations |
+| Inventory Service | 3004 | Raw material stock, auto-deduction, low-stock alerts |
+| Inventory Worker | — | RabbitMQ consumer for kitchen.ticket_created events |
 
 ## Tech Stack
 
@@ -246,6 +253,37 @@ MenuItem
   └── KitchenStation[]     which kitchen station handles this menu
 ```
 
+### Inventory Management
+```bash
+# Create raw material (links to catalog ingredient)
+curl -X POST http://localhost:8080/v1/inventory/materials \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"catalog_ingredient_id":1,"name":"หมูสับ","unit":"g","reorder_point":500}'
+
+# List all materials
+curl http://localhost:8080/v1/inventory/materials
+
+# Check low-stock items
+curl http://localhost:8080/v1/inventory/materials/low-stock
+
+# Restock (JWT required)
+curl -X POST http://localhost:8080/v1/inventory/stock/restock \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"material_id":1,"quantity":2000,"note":"สั่งจากซัพพลายเออร์ A"}'
+
+# Manual deduct by BOM — calls Catalog to get recipe then deducts (JWT required)
+curl -X POST http://localhost:8080/v1/inventory/stock/deduct \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"order_id":42,"items":[{"menu_item_id":1,"quantity":2,"portion_multiplier":1.5}]}'
+
+# Transaction history (JWT required)
+curl http://localhost:8080/v1/inventory/transactions
+curl http://localhost:8080/v1/inventory/transactions/1
+```
+
 ## Order Flow
 
 ```
@@ -262,24 +300,33 @@ sequenceDiagram
 
 ## Event-Driven Architecture
 
-### RabbitMQ Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Exchange | `order_events` (topic) |
-| Queue | `kitchen_order_queue` |
-| Routing Key | `order.created` |
-| Durability | Durable (survives restarts) |
-
-### Message Payload
-```json
-{
-  "order_id": 1,
-  "items": "[]"
-}
+```
+Order Service ──order.created──► Kitchen Worker ──kitchen.ticket_created──► Inventory Worker
+                [order_events]                      [kitchen_events]
 ```
 
-Correlation ID is passed via RabbitMQ message headers for end-to-end request tracing.
+### RabbitMQ Configuration
+
+| Exchange | Routing Key | Producer | Consumer | Queue |
+|----------|-------------|----------|----------|-------|
+| `order_events` | `order.created` | Order Service | Kitchen Worker | `kitchen_order_queue` |
+| `kitchen_events` | `kitchen.ticket_created` | Kitchen Worker | Inventory Worker | `inventory_kitchen_queue` |
+
+### Event Payloads
+
+**order.created**
+```json
+{ "order_id": 1, "items": "[]" }
+```
+
+**kitchen.ticket_created**
+```json
+{ "order_id": 1, "ticket_id": 5, "items": "[]" }
+```
+
+> **Note:** `items` is currently `"[]"` (Order Service TODO). When populated with `[{"menu_item_id":1,"quantity":2,"portion_multiplier":1.0}]`, Inventory Worker will auto-deduct stock via BOM lookup from Catalog Service.
+
+Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-end request tracing.
 
 ## Authentication & Security
 
@@ -322,6 +369,14 @@ DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
 REDIS_URL=redis:6379
 ```
 
+### Inventory Service
+```env
+PORT=3004
+DB_URL=postgres://admin:admin@db:5432/inventory_db?sslmode=disable
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+CATALOG_SERVICE_URL=http://catalog-service-api:3003
+```
+
 ## Resilience Patterns
 
 ### Circuit Breaker (Order → Kitchen)
@@ -341,6 +396,7 @@ When the circuit is open, Order Service returns: `"Kitchen service is unavailabl
 - Kitchen Service: `kitchen-service-api:3001/metrics`
 - Auth Service: `auth-service-api:3002/metrics`
 - Catalog Service: `catalog-service-api:3003/metrics`
+- Inventory Service: `inventory-service-api:3004/metrics`
 - Gateway: `api-gateway:9091/metrics`
 
 ### Structured Logging
@@ -402,7 +458,18 @@ food-delivery/
 ├── docker-compose.yaml      # Full stack orchestration
 ├── prometheus.yml           # Metrics scrape config
 ├── promtail-config.yaml     # Log shipping config
-├── init.sql                 # Creates order_db, kitchen_db, auth_db, catalog_db
+├── inventory-service/
+│   ├── cmd/
+│   │   ├── main.go          # API server (port 3004)
+│   │   └── worker/main.go   # Consumes kitchen.ticket_created, deducts stock
+│   └── internal/
+│       ├── catalog/         # HTTP client for Catalog Service BOM lookup
+│       ├── handler/         # material, stock, transaction handlers
+│       ├── middleware/      # Logger
+│       ├── model/           # RawMaterial, StockTransaction
+│       ├── repository/      # material_repository, transaction_repository
+│       └── service/         # material_service, stock_service (DeductByBOM)
+├── init.sql                 # Creates order_db, kitchen_db, auth_db, catalog_db, inventory_db
 ├── private_key.pem          # RSA private key (JWT signing)
 ├── public_key.pem           # RSA public key
 └── public_key.json          # JWKS format (KrakenD JWT validation)
@@ -472,6 +539,16 @@ id, name (unique), description, created_at, updated_at
 menu_item_id (PK), kitchen_station_id (PK)
 ```
 
+**raw_materials** (inventory_db)
+```
+id, catalog_ingredient_id (nullable, links to catalog), name (unique), unit, current_stock (decimal 12,3), reorder_point, created_at, updated_at
+```
+
+**stock_transactions** (inventory_db)
+```
+id, raw_material_id, quantity_change (decimal 12,3), type (RESTOCK|DEDUCTION|ADJUSTMENT), order_id (nullable), correlation_id, note, created_at
+```
+
 ## Development
 
 ### Regenerate Swagger Docs (Order Service)
@@ -487,4 +564,6 @@ docker-compose up -d --build auth-service
 docker-compose up -d --build api           # order-service
 docker-compose up -d --build kitchen-api
 docker-compose up -d --build catalog-service
+docker-compose up -d --build inventory-api
+docker-compose up -d --build inventory-worker
 ```

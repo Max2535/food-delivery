@@ -21,3 +21,7 @@ scrape_configs:
   - job_name: 'catalog-service'
     static_configs:
       - targets: ['catalog-service-api:3003']
+
+  - job_name: 'inventory-service'
+    static_configs:
+      - targets: ['inventory-service-api:3004']
