@@ -4,7 +4,7 @@ Development guide for Claude Code when working in this repository.
 
 ## Project Overview
 
-Microservices-based food delivery backend written in Go. Four main services (auth, order, kitchen, catalog) communicate through RabbitMQ events and are exposed via KrakenD API gateway. Full observability via Prometheus + Grafana + Loki.
+Microservices-based food delivery backend written in Go. Five main services (auth, order, kitchen, catalog, inventory) communicate through RabbitMQ events and are exposed via KrakenD API gateway. Full observability via Prometheus + Grafana + Loki.
 
 ## Repository Structure
 
@@ -14,12 +14,13 @@ food-delivery/
 ├── order-service/       # Order CRUD + RabbitMQ publisher
 ├── kitchen-service/     # Kitchen tickets + RabbitMQ consumer worker
 ├── catalog-service/     # Master data: menus, BOM, add-ons, portions, stations
+├── inventory-service/   # Stock tracking, auto-deduction, low-stock alerts
 ├── gateway/             # KrakenD plugin (correlation ID injector)
-├── docker-compose.yaml  # Full stack (17 containers)
+├── docker-compose.yaml  # Full stack (19 containers)
 ├── krakend.json         # Gateway routing + JWT validation config
 ├── prometheus.yml       # Metrics scrape config
 ├── promtail-config.yaml # Loki log shipping
-├── init.sql             # Creates 4 PostgreSQL databases
+├── init.sql             # Creates 5 PostgreSQL databases
 ├── private_key.pem      # RSA-2048 private key (JWT signing)
 ├── public_key.pem       # RSA public key
 └── public_key.json      # JWKS format for KrakenD
@@ -30,7 +31,7 @@ Each service is a standalone Go module with its own `go.mod`.
 ## Tech Stack
 
 - **Go 1.25.7**, **Go Fiber v2**, **GORM**
-- **PostgreSQL 15** — one DB per service (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`)
+- **PostgreSQL 15** — one DB per service (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`, `inventory_db`)
 - **Redis 7** — caching layer (currently used by Catalog Service)
 - **RabbitMQ 3** — async event bus between Order and Kitchen
 - **KrakenD** — API gateway with JWT RS256 validation
@@ -52,6 +53,8 @@ docker-compose up -d --build auth-service
 docker-compose up -d --build kitchen-api
 docker-compose up -d --build kitchen-worker
 docker-compose up -d --build catalog-service
+docker-compose up -d --build inventory-api
+docker-compose up -d --build inventory-worker
 ```
 
 ## Service Ports
@@ -63,6 +66,7 @@ docker-compose up -d --build catalog-service
 | Kitchen Service | 3001 | 3001 |
 | Auth Service | 3002 | 3005 |
 | Catalog Service | 3003 | 3003 |
+| Inventory Service | 3004 | 3004 |
 | PostgreSQL | 5432 | 5432 |
 | pgAdmin | 80 | 5050 |
 | RabbitMQ | 5672 | 5672 |
@@ -77,7 +81,7 @@ docker-compose up -d --build catalog-service
 ## Key Architectural Decisions
 
 ### Each Service Has Its Own Database
-Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`).
+Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`, `inventory_db`).
 
 ### Authentication Flow
 1. Auth Service issues RS256 JWT signed with `private_key.pem`
@@ -89,8 +93,22 @@ Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`
 
 ### Inter-Service Communication
 - **Sync (via gateway):** Client → KrakenD → Service
-- **Async (RabbitMQ):** Order Service publishes `order.created` → Kitchen Worker consumes
-- Exchange: `order_events` (topic), Queue: `kitchen_order_queue`, Routing key: `order.created`
+- **Async (RabbitMQ):**
+  - Order Service publishes `order.created` → Kitchen Worker consumes → creates KitchenTicket
+  - Kitchen Worker publishes `kitchen.ticket_created` → Inventory Worker consumes → deducts stock via BOM
+- Exchanges: `order_events` (topic), `kitchen_events` (topic)
+- Queues: `kitchen_order_queue`, `inventory_kitchen_queue`
+
+### Inventory Service — Stock Tracking
+Inventory Service owns stock levels for raw materials. It does not duplicate ingredient master data — it links via `catalog_ingredient_id` to ingredients in Catalog Service.
+
+**Auto-deduction flow:**
+1. Kitchen Worker creates KitchenTicket and publishes `kitchen.ticket_created` to `kitchen_events` exchange
+2. Inventory Worker consumes the event and calls Catalog Service HTTP API (`GET /api/v1/catalog/menus/{id}/bom`) to resolve BOM
+3. For each BOM ingredient, finds the matching `RawMaterial` by `catalog_ingredient_id` and deducts stock
+4. If `current_stock < reorder_point`, logs `Warn` alert with `alert: LOW_STOCK` field
+
+**Note:** Auto-deduction requires Order Service to include `menu_item_ids` in the RabbitMQ event payload (currently a TODO). Manual deduction is available via `POST /v1/inventory/stock/deduct`.
 
 ### Catalog Service — Master Data
 Catalog Service is the source of truth for menu data. It does NOT receive events — other services query it via the gateway if needed.
@@ -200,6 +218,14 @@ SERVICE_ADDRESS=kitchen-api
 PORT=3003
 DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
 REDIS_URL=redis:6379
+```
+
+### Inventory Service
+```
+PORT=3004
+DB_URL=postgres://admin:admin@db:5432/inventory_db?sslmode=disable
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+CATALOG_SERVICE_URL=http://catalog-service-api:3003
 ```
 
 ## Testing

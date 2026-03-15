@@ -111,6 +111,37 @@ services:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
 
+  inventory-api:
+    build: ./inventory-service
+    container_name: inventory-service-api
+    restart: always
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - DB_URL=postgres://admin:admin@db:5432/inventory_db?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - CATALOG_SERVICE_URL=http://catalog-service-api:3003
+    depends_on:
+      - db
+      - rabbitmq
+      - catalog-service
+    command: ["./api"]
+
+  inventory-worker:
+    build: ./inventory-service
+    container_name: inventory-service-worker
+    restart: always
+    environment:
+      - DB_URL=postgres://admin:admin@db:5432/inventory_db?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - CATALOG_SERVICE_URL=http://catalog-service-api:3003
+    depends_on:
+      - db
+      - rabbitmq
+      - catalog-service
+    command: ["./worker"]
+
   catalog-service:
     build: ./catalog-service
     container_name: catalog-service-api

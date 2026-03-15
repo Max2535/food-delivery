@@ -437,6 +437,77 @@
       ]
     },
     {
+      "endpoint": "/v1/inventory/materials",
+      "method": "GET",
+      "backend": [{ "url_pattern": "/api/v1/inventory/materials", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/materials/low-stock",
+      "method": "GET",
+      "backend": [{ "url_pattern": "/api/v1/inventory/materials/low-stock", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/materials/{id}",
+      "method": "GET",
+      "backend": [{ "url_pattern": "/api/v1/inventory/materials/{id}", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/materials",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/materials", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/materials/{id}",
+      "method": "PUT",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/materials/{id}", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/stock/restock",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/stock/restock", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/stock/adjust",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/stock/adjust", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/stock/deduct",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/stock/deduct", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/transactions",
+      "method": "GET",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/transactions", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
+      "endpoint": "/v1/inventory/transactions/{material_id}",
+      "method": "GET",
+      "extra_config": {
+        "auth/validator": { "alg": "RS256", "jwk_local_path": "/etc/krakend/public_key.json", "disable_jwk_security": true, "propagate_claims": [["user_id", "X-User-Id"]] }
+      },
+      "backend": [{ "url_pattern": "/api/v1/inventory/transactions/{material_id}", "host": ["http://inventory-service-api:3004"] }]
+    },
+    {
       "endpoint": "/v1/auth/login",
       "method": "POST",
       "backend": [
