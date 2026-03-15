@@ -120,8 +120,16 @@ services:
     environment:
       - PORT=3003
       - DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
+      - REDIS_URL=redis:6379
     depends_on:
       - db
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
 
   auth-service:
     build: ./auth-service

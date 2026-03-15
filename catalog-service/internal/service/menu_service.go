@@ -3,7 +3,14 @@ package service
 import (
 	"catalog-service/internal/model"
 	"catalog-service/internal/repository"
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 var ErrMenuItemAlreadyExists = errors.New("menu item name already exists")
@@ -17,19 +24,74 @@ type MenuService interface {
 }
 
 type menuService struct {
-	repo repository.MenuRepository
+	repo  repository.MenuRepository
+	redis *redis.Client
 }
 
-func NewMenuService(repo repository.MenuRepository) MenuService {
-	return &menuService{repo: repo}
+const (
+	menuCacheKey    = "catalog:menus:all"
+	menuItemKeyPrefix = "catalog:menu:"
+	cacheTTL        = 10 * time.Minute
+)
+
+func NewMenuService(repo repository.MenuRepository, redisClient *redis.Client) MenuService {
+	return &menuService{
+		repo:  repo,
+		redis: redisClient,
+	}
 }
 
 func (s *menuService) GetAllMenuItems() ([]model.MenuItem, error) {
-	return s.repo.FindAll()
+	ctx := context.Background()
+
+	// Try to get from cache
+	val, err := s.redis.Get(ctx, menuCacheKey).Result()
+	if err == nil {
+		var items []model.MenuItem
+		if err := json.Unmarshal([]byte(val), &items); err == nil {
+			log.Info().Msg("Cache hit: GetAllMenuItems")
+			return items, nil
+		}
+	}
+
+	// Cache miss, get from repo
+	items, err := s.repo.FindAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to cache
+	data, _ := json.Marshal(items)
+	s.redis.Set(ctx, menuCacheKey, data, cacheTTL)
+
+	return items, nil
 }
 
 func (s *menuService) GetMenuItemByID(id uint) (*model.MenuItem, error) {
-	return s.repo.FindByID(id)
+	ctx := context.Background()
+	cacheKey := fmt.Sprintf("%s%d", menuItemKeyPrefix, id)
+
+	// Try to get from cache
+	val, err := s.redis.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var item model.MenuItem
+		if err := json.Unmarshal([]byte(val), &item); err == nil {
+			log.Info().Uint("id", id).Msg("Cache hit: GetMenuItemByID")
+			return &item, nil
+		}
+	}
+
+	// Cache miss
+	item, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to cache
+	data, _ := json.Marshal(item)
+	s.redis.Set(ctx, cacheKey, data, cacheTTL)
+
+	return item, nil
 }
 
 func (s *menuService) CreateMenuItem(item *model.MenuItem) error {
@@ -37,7 +99,13 @@ func (s *menuService) CreateMenuItem(item *model.MenuItem) error {
 	if existing != nil {
 		return ErrMenuItemAlreadyExists
 	}
-	return s.repo.Create(item)
+	if err := s.repo.Create(item); err != nil {
+		return err
+	}
+
+	// Invalidate cache
+	s.redis.Del(context.Background(), menuCacheKey)
+	return nil
 }
 
 func (s *menuService) UpdateMenuItem(id uint, input *model.MenuItem) (*model.MenuItem, error) {
@@ -62,9 +130,24 @@ func (s *menuService) UpdateMenuItem(id uint, input *model.MenuItem) (*model.Men
 	if err := s.repo.Update(existing); err != nil {
 		return nil, err
 	}
+
+	// Invalidate cache
+	ctx := context.Background()
+	s.redis.Del(ctx, menuCacheKey)
+	s.redis.Del(ctx, fmt.Sprintf("%s%d", menuItemKeyPrefix, id))
+
 	return existing, nil
 }
 
 func (s *menuService) DeleteMenuItem(id uint) error {
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+
+	// Invalidate cache
+	ctx := context.Background()
+	s.redis.Del(ctx, menuCacheKey)
+	s.redis.Del(ctx, fmt.Sprintf("%s%d", menuItemKeyPrefix, id))
+
+	return nil
 }
