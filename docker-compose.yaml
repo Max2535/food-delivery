@@ -111,6 +111,18 @@ services:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
 
+  catalog-service:
+    build: ./catalog-service
+    container_name: catalog-service-api
+    restart: always
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
+    depends_on:
+      - db
+
   auth-service:
     build: ./auth-service
     container_name: auth-service-api
@@ -140,6 +152,7 @@ services:
       - api
       - kitchen-api
       - auth-service
+      - catalog-service
 
   krakend-designer:
     image: devopsfaith/krakendesigner:latest
