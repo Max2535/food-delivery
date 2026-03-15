@@ -22,11 +22,15 @@ KrakenD API Gateway (port 8080)
   │      ├── Circuit Breaker (Sony GoBreaker)                  │
   │      └── Consul Client                                     │
   │                                                            ▼
-  └──► Kitchen Service (port 3001)                    RabbitMQ (port 5672)
-         ├── PostgreSQL (kitchen_db)                      │
-         ├── Consul Registration                          │
-         └── Kitchen Worker ◄────────────────────────────┘
-               └── Consumes order.created events
+  ├──► Kitchen Service (port 3001)                    RabbitMQ (port 5672)
+  │      ├── PostgreSQL (kitchen_db)                      │
+  │      ├── Consul Registration                          │
+  │      └── Kitchen Worker ◄────────────────────────────┘
+  │            └── Consumes order.created events
+  │
+  └──► Catalog Service (port 3003)
+         ├── PostgreSQL (catalog_db)
+         └── Redis (caching)
 
 Observability:
   Prometheus (9090) ◄── scrapes all services
@@ -34,6 +38,8 @@ Observability:
   Loki (3100) ◄── Promtail ◄── Docker logs
   Consul UI (8500) ◄── service registry
   RabbitMQ UI (15672) ◄── message broker management
+  Redis Insight (8001) ◄── Redis browser
+  pgAdmin (5050) ◄── PostgreSQL browser
 ```
 
 ## Services
@@ -45,12 +51,14 @@ Observability:
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
+| Catalog Service | 3003 | Master data: menus, BOM, add-ons, portions, stations |
 
 ## Tech Stack
 
 - **Language:** Go 1.25.7
 - **Web Framework:** Go Fiber v2
 - **ORM:** GORM with PostgreSQL 15
+- **Cache:** Redis 7
 - **Message Broker:** RabbitMQ 3
 - **API Gateway:** KrakenD
 - **Service Discovery:** HashiCorp Consul
@@ -90,6 +98,8 @@ docker-compose ps
 | Prometheus | http://localhost:9090 | — |
 | RabbitMQ UI | http://localhost:15672 | guest / guest |
 | Consul UI | http://localhost:8500 | — |
+| Redis Insight | http://localhost:8001 | — |
+| pgAdmin | http://localhost:5050 | admin@admin.com / admin |
 | Order Swagger | http://localhost:3000/swagger/index.html | — |
 
 ## API Reference
@@ -107,10 +117,9 @@ curl -X POST http://localhost:8080/v1/auth/register \
 
 #### Login
 ```bash
-curl -X POST http://localhost:8080/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "john", "password": "secret"}'
-# Response: {"token": "eyJhbGc..."}
+  -d '{"username": "john", "password": "secret"}' | jq -r .token)
 ```
 
 ### Orders (requires JWT)
@@ -119,7 +128,7 @@ curl -X POST http://localhost:8080/v1/auth/login \
 ```bash
 curl -X POST http://localhost:8080/v1/orders \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <TOKEN>" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"customer_id": "cust_001", "total_amount": 45.50}'
 ```
 
@@ -128,6 +137,113 @@ curl -X POST http://localhost:8080/v1/orders \
 #### Check Kitchen Status
 ```bash
 curl http://localhost:8080/v1/kitchen/status/{orderId}
+```
+
+### Catalog
+
+#### Menu Management
+```bash
+# List all menus
+curl http://localhost:8080/v1/catalog/menus
+
+# Get one menu (includes station info)
+curl http://localhost:8080/v1/catalog/menus/1
+
+# Create menu (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"ข้าวผัดกระเพราหมูสับ","price":65.00,"category":"อาหารจานเดียว"}'
+
+# Update / Delete (JWT required)
+curl -X PUT  http://localhost:8080/v1/catalog/menus/1 -H "Authorization: Bearer $TOKEN" ...
+curl -X DELETE http://localhost:8080/v1/catalog/menus/1 -H "Authorization: Bearer $TOKEN"
+```
+
+#### BOM — Fixed Recipe
+```bash
+# Add ingredient to recipe (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/bom \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"ingredient_id":1,"quantity":100}'
+
+# Get recipe for a menu
+curl http://localhost:8080/v1/catalog/menus/1/bom
+```
+
+#### Choice Groups — Customer Substitution (Case 1)
+```bash
+# Create choice group e.g. "เลือกเส้น" (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/choices \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"เลือกเส้น","is_required":true,"min_choices":1,"max_choices":1}'
+
+# Add option to group (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/choices/1/options \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"ingredient_id":5,"quantity":150,"extra_price":0}'
+
+# List choices
+curl http://localhost:8080/v1/catalog/menus/1/choices
+```
+
+#### Add-ons — Optional Extras (Case 2)
+```bash
+# Add optional extra e.g. ไข่ดาว +10฿ (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/addons \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"ingredient_id":3,"quantity":1,"extra_price":10}'
+
+# List add-ons
+curl http://localhost:8080/v1/catalog/menus/1/addons
+```
+
+#### Portion Sizes — Size Variants (Case 3)
+```bash
+# Create size variants (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/portions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"ธรรมดา","quantity_multiplier":1.0,"extra_price":0,"is_default":true}'
+
+curl -X POST http://localhost:8080/v1/catalog/menus/1/portions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"พิเศษ","quantity_multiplier":1.5,"extra_price":15}'
+
+# List portions
+curl http://localhost:8080/v1/catalog/menus/1/portions
+```
+
+#### Kitchen Stations
+```bash
+# Create station (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/stations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"ครัวร้อน","description":"ผัด ทอด"}'
+
+# Assign menu to station (JWT required)
+curl -X POST http://localhost:8080/v1/catalog/menus/1/station \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"kitchen_station_id":1}'
+```
+
+## Catalog Domain Model
+
+```
+MenuItem
+  ├── BOMItem[]            fixed recipe (ingredient + quantity)
+  ├── BOMChoiceGroup[]     customer picks one from a group (e.g. เลือกเส้น)
+  │     └── BOMChoiceOption[]  each option = ingredient + qty + extra_price
+  ├── MenuAddOn[]          optional extras + extra_price (e.g. ไข่ดาว +10฿)
+  ├── MenuPortionSize[]    size variants + quantity_multiplier (e.g. พิเศษ ×1.5 +15฿)
+  └── KitchenStation[]     which kitchen station handles this menu
 ```
 
 ## Order Flow
@@ -199,6 +315,13 @@ CONSUL_ADDRESS=consul:8500
 SERVICE_ADDRESS=kitchen-api
 ```
 
+### Catalog Service
+```env
+PORT=3003
+DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
+REDIS_URL=redis:6379
+```
+
 ## Resilience Patterns
 
 ### Circuit Breaker (Order → Kitchen)
@@ -217,6 +340,7 @@ When the circuit is open, Order Service returns: `"Kitchen service is unavailabl
 - Order Service: `order-service-api:3000/metrics`
 - Kitchen Service: `kitchen-service-api:3001/metrics`
 - Auth Service: `auth-service-api:3002/metrics`
+- Catalog Service: `catalog-service-api:3003/metrics`
 - Gateway: `api-gateway:9091/metrics`
 
 ### Structured Logging
@@ -262,13 +386,23 @@ food-delivery/
 │       ├── repository/      # Database layer
 │       ├── service/         # Kitchen business logic
 │       └── worker/          # Event consumer
+├── catalog-service/
+│   ├── cmd/main.go
+│   └── internal/
+│       ├── handler/         # menu, ingredient, bom, choice, addon, portion, station
+│       ├── middleware/      # Logger + Correlation ID
+│       ├── model/           # MenuItem, Ingredient, BOMItem, BOMChoiceGroup,
+│       │                    #   BOMChoiceOption, MenuAddOn, MenuPortionSize,
+│       │                    #   KitchenStation, MenuStationMapping
+│       ├── repository/      # Database layer (7 repositories)
+│       └── service/         # Business logic (7 services)
 ├── gateway/
 │   └── plugin/              # Correlation ID injector plugin
 ├── krakend.json             # API Gateway routing & JWT config
 ├── docker-compose.yaml      # Full stack orchestration
 ├── prometheus.yml           # Metrics scrape config
 ├── promtail-config.yaml     # Log shipping config
-├── init.sql                 # Creates order_db, kitchen_db, auth_db
+├── init.sql                 # Creates order_db, kitchen_db, auth_db, catalog_db
 ├── private_key.pem          # RSA private key (JWT signing)
 ├── public_key.pem           # RSA public key
 └── public_key.json          # JWKS format (KrakenD JWT validation)
@@ -293,6 +427,51 @@ id, customer_id, total_amount (decimal 10,2), status (default: Pending), created
 id, order_id (unique), items (JSON), status (Received|Cooking|Ready), created_at
 ```
 
+**menu_items** (catalog_db)
+```
+id, name (unique), description, price (decimal 10,2), category, is_available, created_at, updated_at
+```
+
+**ingredients** (catalog_db)
+```
+id, name (unique), unit (g/ml/piece/...), created_at, updated_at
+```
+
+**bom_items** (catalog_db)
+```
+id, menu_item_id, ingredient_id, quantity (decimal 10,3), created_at, updated_at
+```
+
+**bom_choice_groups** (catalog_db)
+```
+id, menu_item_id, name, is_required, min_choices, max_choices, created_at, updated_at
+```
+
+**bom_choice_options** (catalog_db)
+```
+id, group_id, ingredient_id, quantity, extra_price (decimal 10,2), created_at, updated_at
+```
+
+**menu_add_ons** (catalog_db)
+```
+id, menu_item_id, ingredient_id, quantity, extra_price, is_available, created_at, updated_at
+```
+
+**menu_portion_sizes** (catalog_db)
+```
+id, menu_item_id, name, quantity_multiplier (decimal 5,2), extra_price, is_default, created_at, updated_at
+```
+
+**kitchen_stations** (catalog_db)
+```
+id, name (unique), description, created_at, updated_at
+```
+
+**menu_station_mappings** (catalog_db)
+```
+menu_item_id (PK), kitchen_station_id (PK)
+```
+
 ## Development
 
 ### Regenerate Swagger Docs (Order Service)
@@ -302,18 +481,10 @@ go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d .
 docker-compose up -d --build api
 ```
 
-### Database Scripts
-```bash
-# Setup tables
-go run scripts/setup_db.go
-
-# Seed sample data
-go run scripts/seed_db.go
-```
-
 ### Rebuild a Single Service
 ```bash
 docker-compose up -d --build auth-service
 docker-compose up -d --build api           # order-service
 docker-compose up -d --build kitchen-api
+docker-compose up -d --build catalog-service
 ```

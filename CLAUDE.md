@@ -4,7 +4,7 @@ Development guide for Claude Code when working in this repository.
 
 ## Project Overview
 
-Microservices-based food delivery backend written in Go. Three main services (auth, order, kitchen) communicate through RabbitMQ events and are exposed via KrakenD API gateway. Full observability via Prometheus + Grafana + Loki.
+Microservices-based food delivery backend written in Go. Four main services (auth, order, kitchen, catalog) communicate through RabbitMQ events and are exposed via KrakenD API gateway. Full observability via Prometheus + Grafana + Loki.
 
 ## Repository Structure
 
@@ -13,12 +13,13 @@ food-delivery/
 ├── auth-service/        # JWT issuance, user management
 ├── order-service/       # Order CRUD + RabbitMQ publisher
 ├── kitchen-service/     # Kitchen tickets + RabbitMQ consumer worker
+├── catalog-service/     # Master data: menus, BOM, add-ons, portions, stations
 ├── gateway/             # KrakenD plugin (correlation ID injector)
-├── docker-compose.yaml  # Full stack (12 containers)
+├── docker-compose.yaml  # Full stack (17 containers)
 ├── krakend.json         # Gateway routing + JWT validation config
 ├── prometheus.yml       # Metrics scrape config
 ├── promtail-config.yaml # Loki log shipping
-├── init.sql             # Creates 3 PostgreSQL databases
+├── init.sql             # Creates 4 PostgreSQL databases
 ├── private_key.pem      # RSA-2048 private key (JWT signing)
 ├── public_key.pem       # RSA public key
 └── public_key.json      # JWKS format for KrakenD
@@ -29,7 +30,8 @@ Each service is a standalone Go module with its own `go.mod`.
 ## Tech Stack
 
 - **Go 1.25.7**, **Go Fiber v2**, **GORM**
-- **PostgreSQL 15** — one DB per service (`order_db`, `kitchen_db`, `auth_db`)
+- **PostgreSQL 15** — one DB per service (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`)
+- **Redis 7** — caching layer (currently used by Catalog Service)
 - **RabbitMQ 3** — async event bus between Order and Kitchen
 - **KrakenD** — API gateway with JWT RS256 validation
 - **Consul** — service discovery (Kitchen registers; Order can discover)
@@ -45,10 +47,11 @@ Each service is a standalone Go module with its own `go.mod`.
 docker-compose up -d --build
 
 # Rebuild one service
-docker-compose up -d --build api          # order-service
+docker-compose up -d --build api              # order-service
 docker-compose up -d --build auth-service
 docker-compose up -d --build kitchen-api
 docker-compose up -d --build kitchen-worker
+docker-compose up -d --build catalog-service
 ```
 
 ## Service Ports
@@ -59,9 +62,13 @@ docker-compose up -d --build kitchen-worker
 | Order Service | 3000 | 3000 |
 | Kitchen Service | 3001 | 3001 |
 | Auth Service | 3002 | 3005 |
+| Catalog Service | 3003 | 3003 |
 | PostgreSQL | 5432 | 5432 |
+| pgAdmin | 80 | 5050 |
 | RabbitMQ | 5672 | 5672 |
 | RabbitMQ UI | 15672 | 15672 |
+| Redis | 6379 | 6379 |
+| Redis Insight | 5540 | 8001 |
 | Consul | 8500 | 8500 |
 | Prometheus | 9090 | 9090 |
 | Grafana | 3000 | 3002 |
@@ -70,7 +77,7 @@ docker-compose up -d --build kitchen-worker
 ## Key Architectural Decisions
 
 ### Each Service Has Its Own Database
-Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`).
+Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`).
 
 ### Authentication Flow
 1. Auth Service issues RS256 JWT signed with `private_key.pem`
@@ -78,12 +85,26 @@ Never share a database between services. Each service owns its schema and connec
 3. Extracted claims (`user_id`) forwarded as `X-User-Id` header to backend
 4. Services do NOT validate JWT themselves — trust the gateway
 
-Protected endpoint: `POST /v1/orders` (via KrakenD `jose` plugin)
+Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`
 
 ### Inter-Service Communication
 - **Sync (via gateway):** Client → KrakenD → Service
 - **Async (RabbitMQ):** Order Service publishes `order.created` → Kitchen Worker consumes
 - Exchange: `order_events` (topic), Queue: `kitchen_order_queue`, Routing key: `order.created`
+
+### Catalog Service — Master Data
+Catalog Service is the source of truth for menu data. It does NOT receive events — other services query it via the gateway if needed.
+
+**Domain model:**
+```
+MenuItem
+  ├── BOMItem[]           — fixed recipe ingredients
+  ├── BOMChoiceGroup[]    — customer-selectable ingredient groups (e.g. เลือกเส้น)
+  │     └── BOMChoiceOption[]
+  ├── MenuAddOn[]         — optional extras with extra_price (e.g. ไข่ดาว +10฿)
+  ├── MenuPortionSize[]   — size variants with quantity_multiplier (e.g. พิเศษ ×1.5)
+  └── KitchenStation[]    — which kitchen station handles this menu item
+```
 
 ### Correlation ID Tracing
 - KrakenD plugin (`gateway/plugin/`) injects `X-Correlation-ID` if missing
@@ -101,7 +122,8 @@ Order Service wraps Kitchen Service calls with Sony GoBreaker. If adding new cro
 4. Add to `docker-compose.yaml`
 5. Add Prometheus scrape target to `prometheus.yml`
 6. Add gateway routes to `krakend.json`
-7. Register with Consul if other services need to discover it
+7. Add database to `init.sql`
+8. Register with Consul if other services need to discover it
 
 ## Adding a New KrakenD Endpoint
 
@@ -111,7 +133,10 @@ Edit `krakend.json`. For a protected endpoint add:
   "auth/validator": {
     "alg": "RS256",
     "jwk_local_path": "/etc/krakend/public_key.json",
-    "disable_jwk_security": true
+    "disable_jwk_security": true,
+    "propagate_claims": [
+      ["user_id", "X-User-Id"]
+    ]
   }
 }
 ```
@@ -170,6 +195,13 @@ CONSUL_ADDRESS=consul:8500
 SERVICE_ADDRESS=kitchen-api
 ```
 
+### Catalog Service
+```
+PORT=3003
+DB_URL=postgres://admin:admin@db:5432/catalog_db?sslmode=disable
+REDIS_URL=redis:6379
+```
+
 ## Testing
 
 No automated test suite exists yet. Manual testing flow:
@@ -193,6 +225,12 @@ curl -X POST http://localhost:8080/v1/orders \
 
 # 4. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
+
+# 5. Create a catalog menu item
+curl -X POST http://localhost:8080/v1/catalog/menus \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"ข้าวผัดกระเพราหมูสับ","price":65.00,"category":"อาหารจานเดียว"}'
 ```
 
 ## Observability URLs
@@ -201,3 +239,5 @@ curl http://localhost:8080/v1/kitchen/status/1
 - Prometheus: http://localhost:9090
 - RabbitMQ: http://localhost:15672 (guest/guest)
 - Consul: http://localhost:8500
+- Redis Insight: http://localhost:8001
+- pgAdmin: http://localhost:5050 (admin@admin.com/admin)
