@@ -83,7 +83,7 @@ func main() {
 	// Services
 	menuSvc := service.NewMenuService(menuRepo, redisClient)
 	ingredientSvc := service.NewIngredientService(ingredientRepo)
-	bomSvc := service.NewBOMService(bomRepo, ingredientRepo)
+	bomSvc := service.NewBOMService(bomRepo, ingredientRepo, menuRepo)
 	stationSvc := service.NewStationService(stationRepo, menuRepo)
 	choiceSvc := service.NewChoiceService(choiceRepo, ingredientRepo)
 	addOnSvc := service.NewAddOnService(addOnRepo, ingredientRepo)
@@ -119,6 +119,7 @@ func main() {
 
 	// BOM endpoints (nested under menus)
 	menus.Get("/:id/bom", bomHandler.GetBOM)
+	menus.Get("/:id/bom/flat", bomHandler.GetFlatBOM)
 	menus.Post("/:id/bom", bomHandler.AddBOMItem)
 	menus.Delete("/:id/bom/:bom_id", bomHandler.DeleteBOMItem)
 

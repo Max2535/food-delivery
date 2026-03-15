@@ -104,9 +104,10 @@ Inventory Service owns stock levels for raw materials. It does not duplicate ing
 
 **Auto-deduction flow:**
 1. Kitchen Worker creates KitchenTicket and publishes `kitchen.ticket_created` to `kitchen_events` exchange
-2. Inventory Worker consumes the event and calls Catalog Service HTTP API (`GET /api/v1/catalog/menus/{id}/bom`) to resolve BOM
-3. For each BOM ingredient, finds the matching `RawMaterial` by `catalog_ingredient_id` and deducts stock
-4. If `current_stock < reorder_point`, logs `Warn` alert with `alert: LOW_STOCK` field
+2. Inventory Worker consumes the event and calls Catalog Service HTTP API (`GET /api/v1/catalog/menus/{id}/bom/flat`) to resolve BOM
+3. The `/bom/flat` endpoint recursively expands all sub-recipes and returns only raw ingredients with multiplied quantities
+4. For each ingredient, finds the matching `RawMaterial` by `catalog_ingredient_id` and deducts stock
+5. If `current_stock < reorder_point`, logs `Warn` alert with `alert: LOW_STOCK` field
 
 **Note:** Auto-deduction requires Order Service to include `menu_item_ids` in the RabbitMQ event payload (currently a TODO). Manual deduction is available via `POST /v1/inventory/stock/deduct`.
 
@@ -116,13 +117,23 @@ Catalog Service is the source of truth for menu data. It does NOT receive events
 **Domain model:**
 ```
 MenuItem
-  ├── BOMItem[]           — fixed recipe ingredients
+  ├── BOMItem[]           — recipe entries (ingredient OR sub-recipe)
+  │     ├── ingredient_id    → raw Ingredient (leaf node)
+  │     └── sub_menu_item_id → another MenuItem whose BOM is expanded recursively
   ├── BOMChoiceGroup[]    — customer-selectable ingredient groups (e.g. เลือกเส้น)
   │     └── BOMChoiceOption[]
   ├── MenuAddOn[]         — optional extras with extra_price (e.g. ไข่ดาว +10฿)
   ├── MenuPortionSize[]   — size variants with quantity_multiplier (e.g. พิเศษ ×1.5)
   └── KitchenStation[]    — which kitchen station handles this menu item
 ```
+
+**Multi-level BOM:** A `BOMItem` can reference either a raw `Ingredient` (leaf) or another `MenuItem` as a sub-recipe. Sub-recipes expand recursively — quantities multiply through each level. The same MenuItem can be sold standalone AND used as a sub-recipe in another menu (e.g. ปลากระพงทอด → ปลากระพงทอดน้ำปลา).
+
+**BOM endpoints:**
+- `GET /api/v1/catalog/menus/:id/bom` — structured BOM (shows nested `sub_menu_item` objects)
+- `GET /api/v1/catalog/menus/:id/bom/flat` — fully-expanded flat list of raw ingredients (used by Inventory Service for stock deduction)
+
+**Constraint:** Each `BOMItem` must have exactly one of `ingredient_id` or `sub_menu_item_id`. Setting both or neither returns `400 Bad Request`. Circular references are detected at insert time and return `422 Unprocessable Entity`.
 
 ### Correlation ID Tracing
 - KrakenD plugin (`gateway/plugin/`) injects `X-Correlation-ID` if missing

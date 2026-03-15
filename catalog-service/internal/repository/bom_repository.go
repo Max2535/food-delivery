@@ -22,7 +22,7 @@ func NewBOMRepository(db *gorm.DB) BOMRepository {
 
 func (r *bomRepository) FindByMenuItemID(menuItemID uint) ([]model.BOMItem, error) {
 	var items []model.BOMItem
-	err := r.db.Preload("Ingredient").Where("menu_item_id = ?", menuItemID).Find(&items).Error
+	err := r.db.Preload("Ingredient").Preload("SubMenuItem").Where("menu_item_id = ?", menuItemID).Find(&items).Error
 	return items, err
 }
 
