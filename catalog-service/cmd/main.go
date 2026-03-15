@@ -50,6 +50,10 @@ func main() {
 		&model.BOMItem{},
 		&model.KitchenStation{},
 		&model.MenuStationMapping{},
+		&model.BOMChoiceGroup{},
+		&model.BOMChoiceOption{},
+		&model.MenuAddOn{},
+		&model.MenuPortionSize{},
 	)
 
 	// Repositories
@@ -57,18 +61,27 @@ func main() {
 	ingredientRepo := repository.NewIngredientRepository(db)
 	bomRepo := repository.NewBOMRepository(db)
 	stationRepo := repository.NewStationRepository(db)
+	choiceRepo := repository.NewChoiceRepository(db)
+	addOnRepo := repository.NewAddOnRepository(db)
+	portionRepo := repository.NewPortionRepository(db)
 
 	// Services
 	menuSvc := service.NewMenuService(menuRepo)
 	ingredientSvc := service.NewIngredientService(ingredientRepo)
 	bomSvc := service.NewBOMService(bomRepo, ingredientRepo)
 	stationSvc := service.NewStationService(stationRepo, menuRepo)
+	choiceSvc := service.NewChoiceService(choiceRepo, ingredientRepo)
+	addOnSvc := service.NewAddOnService(addOnRepo, ingredientRepo)
+	portionSvc := service.NewPortionService(portionRepo, menuRepo)
 
 	// Handlers
 	menuHandler := handler.NewMenuHandler(menuSvc, stationSvc)
 	ingredientHandler := handler.NewIngredientHandler(ingredientSvc)
 	bomHandler := handler.NewBOMHandler(bomSvc)
 	stationHandler := handler.NewStationHandler(stationSvc)
+	choiceHandler := handler.NewChoiceHandler(choiceSvc)
+	addOnHandler := handler.NewAddOnHandler(addOnSvc)
+	portionHandler := handler.NewPortionHandler(portionSvc)
 
 	app := fiber.New()
 
@@ -93,6 +106,23 @@ func main() {
 	menus.Get("/:id/bom", bomHandler.GetBOM)
 	menus.Post("/:id/bom", bomHandler.AddBOMItem)
 	menus.Delete("/:id/bom/:bom_id", bomHandler.DeleteBOMItem)
+
+	// Choice Group endpoints (Case 1: customer selects ingredient)
+	menus.Get("/:id/choices", choiceHandler.GetChoices)
+	menus.Post("/:id/choices", choiceHandler.CreateChoiceGroup)
+	menus.Delete("/:id/choices/:group_id", choiceHandler.DeleteChoiceGroup)
+	menus.Post("/:id/choices/:group_id/options", choiceHandler.AddChoiceOption)
+	menus.Delete("/:id/choices/:group_id/options/:option_id", choiceHandler.DeleteChoiceOption)
+
+	// Add-on endpoints (Case 2: optional extras)
+	menus.Get("/:id/addons", addOnHandler.GetAddOns)
+	menus.Post("/:id/addons", addOnHandler.CreateAddOn)
+	menus.Delete("/:id/addons/:addon_id", addOnHandler.DeleteAddOn)
+
+	// Portion size endpoints (Case 3: size variants)
+	menus.Get("/:id/portions", portionHandler.GetPortions)
+	menus.Post("/:id/portions", portionHandler.CreatePortion)
+	menus.Delete("/:id/portions/:portion_id", portionHandler.DeletePortion)
 
 	// Menu → Station assignment
 	menus.Post("/:id/station", stationHandler.AssignMenuToStation)
