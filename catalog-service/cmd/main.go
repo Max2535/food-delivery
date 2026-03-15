@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -12,9 +13,10 @@ import (
 	"catalog-service/internal/repository"
 	"catalog-service/internal/service"
 
-	fiberprometheus "github.com/ansrivas/fiberprometheus/v2"
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -44,6 +46,19 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database after retries")
 	}
 
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379"
+	}
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: redisURL,
+	})
+
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Warn().Err(err).Msg("Warning: Could not connect to Redis")
+	}
+
 	db.AutoMigrate(
 		&model.MenuItem{},
 		&model.Ingredient{},
@@ -66,7 +81,7 @@ func main() {
 	portionRepo := repository.NewPortionRepository(db)
 
 	// Services
-	menuSvc := service.NewMenuService(menuRepo)
+	menuSvc := service.NewMenuService(menuRepo, redisClient)
 	ingredientSvc := service.NewIngredientService(ingredientRepo)
 	bomSvc := service.NewBOMService(bomRepo, ingredientRepo)
 	stationSvc := service.NewStationService(stationRepo, menuRepo)
