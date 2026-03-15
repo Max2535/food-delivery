@@ -7,10 +7,13 @@ import (
 	"time"
 )
 
-// BOMItem matches the response from catalog-service GET /api/v1/catalog/menus/{id}/bom
+// BOMItem matches the flat response from catalog-service GET /api/v1/catalog/menus/{id}/bom/flat.
+// All sub-recipes are pre-expanded server-side; only raw ingredients are returned.
 type BOMItem struct {
-	IngredientID uint    `json:"ingredient_id"`
-	Quantity     float64 `json:"quantity"`
+	IngredientID   uint    `json:"ingredient_id"`
+	IngredientName string  `json:"ingredient_name"`
+	Unit           string  `json:"unit"`
+	Quantity       float64 `json:"quantity"`
 }
 
 type bomResponse struct {
@@ -30,9 +33,10 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-// GetBOM fetches the bill of materials for a menu item from catalog-service.
+// GetBOM fetches the fully-flattened bill of materials for a menu item from catalog-service.
+// Sub-recipes are recursively expanded server-side; only raw ingredients are returned.
 func (c *Client) GetBOM(menuItemID uint) ([]BOMItem, error) {
-	url := fmt.Sprintf("%s/api/v1/catalog/menus/%d/bom", c.baseURL, menuItemID)
+	url := fmt.Sprintf("%s/api/v1/catalog/menus/%d/bom/flat", c.baseURL, menuItemID)
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("catalog client: %w", err)

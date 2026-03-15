@@ -167,16 +167,27 @@ curl -X PUT  http://localhost:8080/v1/catalog/menus/1 -H "Authorization: Bearer 
 curl -X DELETE http://localhost:8080/v1/catalog/menus/1 -H "Authorization: Bearer $TOKEN"
 ```
 
-#### BOM — Fixed Recipe
+#### BOM — Multi-level Recipe
 ```bash
-# Add ingredient to recipe (JWT required)
+# Add raw ingredient to recipe (JWT required)
 curl -X POST http://localhost:8080/v1/catalog/menus/1/bom \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"ingredient_id":1,"quantity":100}'
 
-# Get recipe for a menu
+# Add another MenuItem as a sub-recipe (JWT required)
+# e.g. ปลากระพงทอดน้ำปลา uses ปลากระพงทอด (menu_id=3) as a component
+curl -X POST http://localhost:8080/v1/catalog/menus/5/bom \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"sub_menu_item_id":3,"quantity":1}'
+
+# Get structured BOM (nested sub-recipes shown)
 curl http://localhost:8080/v1/catalog/menus/1/bom
+
+# Get flat BOM — all sub-recipes expanded, raw ingredients only
+# Used by Inventory Service for stock deduction
+curl http://localhost:8080/v1/catalog/menus/1/bom/flat
 ```
 
 #### Choice Groups — Customer Substitution (Case 1)
@@ -245,13 +256,43 @@ curl -X POST http://localhost:8080/v1/catalog/menus/1/station \
 
 ```
 MenuItem
-  ├── BOMItem[]            fixed recipe (ingredient + quantity)
+  ├── BOMItem[]            recipe entry — one of:
+  │     ├── ingredient_id     → raw Ingredient (leaf)
+  │     └── sub_menu_item_id  → another MenuItem (sub-recipe, expanded recursively)
   ├── BOMChoiceGroup[]     customer picks one from a group (e.g. เลือกเส้น)
   │     └── BOMChoiceOption[]  each option = ingredient + qty + extra_price
   ├── MenuAddOn[]          optional extras + extra_price (e.g. ไข่ดาว +10฿)
   ├── MenuPortionSize[]    size variants + quantity_multiplier (e.g. พิเศษ ×1.5 +15฿)
   └── KitchenStation[]     which kitchen station handles this menu
 ```
+
+### Multi-level BOM
+
+BOM items can reference another `MenuItem` as a sub-recipe. Recipes expand recursively — quantities multiply through each level. A menu item sold standalone can simultaneously be a BOM component of another menu.
+
+**Example — เบอร์เกอร์:**
+```
+เบอร์เกอร์
+  ├── sub_menu_item_id: เนื้อวัวทอดกระเทียม (qty: 1) ← sub-recipe, expands to:
+  │     ├── เนื้อวัว    50 g
+  │     ├── กระเทียม   5 g
+  │     └── น้ำมัน     1 tbsp
+  ├── ingredient_id: ชีส       (qty: 2 แผ่น)
+  └── ingredient_id: มายองเนส  (qty: 2 tbsp)
+```
+
+**Example — ปลากระพงทอดน้ำปลา** (reuses an existing MenuItem):
+```
+ปลากระพงทอดน้ำปลา
+  ├── sub_menu_item_id: ปลากระพงทอด (qty: 1) ← also sold as its own menu item
+  └── ingredient_id: น้ำปลา (qty: 30 ml)
+```
+
+**BOM endpoints:**
+| Endpoint | Description |
+|----------|-------------|
+| `GET /menus/:id/bom` | Structured BOM — shows nested sub-recipe objects |
+| `GET /menus/:id/bom/flat` | Flat BOM — all sub-recipes expanded, raw ingredients only (used for stock deduction) |
 
 ### Inventory Management
 ```bash
@@ -506,7 +547,8 @@ id, name (unique), unit (g/ml/piece/...), created_at, updated_at
 
 **bom_items** (catalog_db)
 ```
-id, menu_item_id, ingredient_id, quantity (decimal 10,3), created_at, updated_at
+id, menu_item_id, ingredient_id (nullable), sub_menu_item_id (nullable), quantity (decimal 10,3), created_at, updated_at
+-- exactly one of ingredient_id or sub_menu_item_id must be non-null
 ```
 
 **bom_choice_groups** (catalog_db)

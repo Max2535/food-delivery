@@ -23,15 +23,18 @@ type Ingredient struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// BOMItem (Bill of Materials) links a MenuItem to its required Ingredients with quantity
+// BOMItem (Bill of Materials) links a MenuItem to either a raw Ingredient or another MenuItem
+// acting as a sub-recipe. Exactly one of IngredientID or SubMenuItemID must be non-nil.
 type BOMItem struct {
-	ID           uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	MenuItemID   uint       `gorm:"not null;index" json:"menu_item_id"`
-	IngredientID uint       `gorm:"not null" json:"ingredient_id"`
-	Quantity     float64    `gorm:"type:decimal(10,3);not null" json:"quantity"`
-	Ingredient   Ingredient `gorm:"foreignKey:IngredientID" json:"ingredient,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	MenuItemID    uint      `gorm:"not null;index" json:"menu_item_id"`
+	IngredientID  *uint     `json:"ingredient_id,omitempty"`
+	SubMenuItemID *uint     `json:"sub_menu_item_id,omitempty"`
+	Quantity      float64   `gorm:"type:decimal(10,3);not null" json:"quantity"`
+	Ingredient    *Ingredient `gorm:"foreignKey:IngredientID" json:"ingredient,omitempty"`
+	SubMenuItem   *MenuItem   `gorm:"foreignKey:SubMenuItemID" json:"sub_menu_item,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // KitchenStation represents a cooking station (e.g. Hot Kitchen, Cold Kitchen, Bar)
