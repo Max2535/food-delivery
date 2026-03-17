@@ -26,13 +26,13 @@ func (r *orderRepository) Create(order *model.Order) error {
 
 func (r *orderRepository) FindAll() ([]model.Order, error) {
 	var orders []model.Order
-	err := r.db.Find(&orders).Error
+	err := r.db.Preload("Items").Find(&orders).Error
 	return orders, err
 }
 
 func (r *orderRepository) FindByID(id uint) (*model.Order, error) {
 	var order model.Order
-	err := r.db.First(&order, id).Error
+	err := r.db.Preload("Items").First(&order, id).Error
 	if err != nil {
 		return nil, err
 	}

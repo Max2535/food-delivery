@@ -37,6 +37,88 @@ func (m *MockOrderRepository) FindByID(id uint) (*model.Order, error) {
 
 // --- Tests ---
 
+func TestCreateOrderFromRequest_Success(t *testing.T) {
+	mockRepo := new(MockOrderRepository)
+	svc := service.NewOrderService(mockRepo)
+
+	req := &model.CreateOrderRequest{
+		CustomerID: "CUST001",
+		Items: []model.CreateOrderItemRequest{
+			{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 2},
+			{MenuItemID: 2, MenuItemName: "ต้มยำกุ้ง", UnitPrice: 120, Quantity: 1},
+		},
+	}
+
+	mockRepo.On("Create", mock.AnythingOfType("*model.Order")).Return(nil)
+
+	order, err := svc.CreateOrderFromRequest(req, "test-correlation-id")
+
+	// Kitchen publish จะ fail (ไม่มี RabbitMQ) แต่ order ยังถูก save ได้
+	assert.NoError(t, err)
+	assert.NotNil(t, order)
+	assert.Equal(t, "pending", order.Status)
+	assert.Equal(t, "CUST001", order.CustomerID)
+	assert.Equal(t, 220.0, order.TotalAmount)
+	assert.Len(t, order.Items, 2)
+	assert.Equal(t, 100.0, order.Items[0].TotalPrice) // 50*2
+	assert.Equal(t, 120.0, order.Items[1].TotalPrice) // 120*1
+	mockRepo.AssertExpectations(t)
+}
+
+func TestCreateOrderFromRequest_EmptyCustomerID(t *testing.T) {
+	mockRepo := new(MockOrderRepository)
+	svc := service.NewOrderService(mockRepo)
+
+	req := &model.CreateOrderRequest{
+		CustomerID: "",
+		Items: []model.CreateOrderItemRequest{
+			{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 1},
+		},
+	}
+
+	order, err := svc.CreateOrderFromRequest(req, "test-correlation-id")
+
+	assert.Error(t, err)
+	assert.Nil(t, order)
+	assert.Contains(t, err.Error(), "customer_id is required")
+}
+
+func TestCreateOrderFromRequest_NoItems(t *testing.T) {
+	mockRepo := new(MockOrderRepository)
+	svc := service.NewOrderService(mockRepo)
+
+	req := &model.CreateOrderRequest{
+		CustomerID: "CUST001",
+		Items:      []model.CreateOrderItemRequest{},
+	}
+
+	order, err := svc.CreateOrderFromRequest(req, "test-correlation-id")
+
+	assert.Error(t, err)
+	assert.Nil(t, order)
+	assert.Contains(t, err.Error(), "at least one item is required")
+}
+
+func TestCreateOrderFromRequest_RepoError(t *testing.T) {
+	mockRepo := new(MockOrderRepository)
+	svc := service.NewOrderService(mockRepo)
+
+	req := &model.CreateOrderRequest{
+		CustomerID: "CUST001",
+		Items: []model.CreateOrderItemRequest{
+			{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 1},
+		},
+	}
+
+	mockRepo.On("Create", mock.AnythingOfType("*model.Order")).Return(errors.New("db error"))
+
+	order, err := svc.CreateOrderFromRequest(req, "test-correlation-id")
+
+	assert.Error(t, err)
+	assert.Nil(t, order)
+	assert.Equal(t, "db error", err.Error())
+}
+
 func TestCreateOrder_SetsDefaultStatus(t *testing.T) {
 	mockRepo := new(MockOrderRepository)
 	svc := service.NewOrderService(mockRepo)

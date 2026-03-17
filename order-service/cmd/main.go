@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// Auto Migrate
-	db.AutoMigrate(&model.Order{})
+	db.AutoMigrate(&model.Order{}, &model.OrderItem{})
 
 	// Initialize Layers
 	orderRepo := repository.NewOrderRepository(db)
