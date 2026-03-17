@@ -73,6 +73,7 @@ func main() {
     api := app.Group("/api/v1/kitchen")
     api.Post("/tickets", hdl.CreateTicket)       // รับ Order จาก Order Service
     api.Patch("/tickets/:orderId", hdl.UpdateStatus) // อัปเดตเมื่อทำเสร็จ
+    api.Get("/queue", hdl.GetQueue)              // ดึงคิวของห้องครัว
 
     // 4. Register with Consul
     registerWithConsul()

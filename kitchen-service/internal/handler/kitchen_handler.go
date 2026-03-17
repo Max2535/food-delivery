@@ -115,3 +115,24 @@ func (h *KitchenHandler) UpdateStatus(c *fiber.Ctx) error {
 		"status":   req.Status,
 	})
 }
+
+// GetQueue ดึงรายการคิวในครัว
+// GetQueue godoc
+// @Summary      Get kitchen queue
+// @Description  Get a prioritized list of active kitchen tickets
+// @Tags         kitchen
+// @Accept       json
+// @Produce      json
+// @Success      200     {array}   model.KitchenTicket
+// @Failure      500     {object}  map[string]interface{}
+// @Router       /api/v1/kitchen/queue [get]
+func (h *KitchenHandler) GetQueue(c *fiber.Ctx) error {
+	queue, err := h.service.GetQueue()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get kitchen queue")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "ไม่สามารถดึงข้อมูลคิวได้",
+		})
+	}
+	return c.JSON(queue)
+}
