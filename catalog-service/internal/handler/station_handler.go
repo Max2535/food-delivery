@@ -22,6 +22,14 @@ type assignStationRequest struct {
 	KitchenStationID uint `json:"kitchen_station_id"`
 }
 
+// GetAllStations godoc
+// @Summary      Get all kitchen stations
+// @Description  Get a list of all defined kitchen stations
+// @Tags         stations
+// @Produce      json
+// @Success      200  {object}  map[string][]model.KitchenStation
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/stations [get]
 func (h *StationHandler) GetAllStations(c *fiber.Ctx) error {
 	stations, err := h.service.GetAllStations()
 	if err != nil {
@@ -32,6 +40,17 @@ func (h *StationHandler) GetAllStations(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"stations": stations})
 }
 
+// CreateStation godoc
+// @Summary      Create a kitchen station
+// @Description  Define a new kitchen station
+// @Tags         stations
+// @Accept       json
+// @Produce      json
+// @Param        station body      model.KitchenStation true  "Station Data"
+// @Success      201     {object}  model.KitchenStation
+// @Failure      400     {object}  map[string]interface{}
+// @Failure      500     {object}  map[string]interface{}
+// @Router       /api/v1/catalog/stations [post]
 func (h *StationHandler) CreateStation(c *fiber.Ctx) error {
 	station := new(model.KitchenStation)
 	if err := c.BodyParser(station); err != nil {
@@ -48,6 +67,17 @@ func (h *StationHandler) CreateStation(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(station)
 }
 
+// AssignMenuToStation godoc
+// @Summary      Assign menu to station
+// @Description  Assign a menu item to be handled by a specific kitchen station
+// @Tags         stations
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int                   true  "Menu Item ID"
+// @Param        req  body      assignStationRequest  true  "Assignment Data"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id}/station [post]
 func (h *StationHandler) AssignMenuToStation(c *fiber.Ctx) error {
 	menuItemID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {

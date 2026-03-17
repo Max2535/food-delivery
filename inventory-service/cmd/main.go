@@ -12,6 +12,8 @@ import (
 	"inventory-service/internal/model"
 	"inventory-service/internal/repository"
 	"inventory-service/internal/service"
+	_ "inventory-service/docs" // Swagger docs
+	swagger "github.com/gofiber/swagger"
 
 	fiberprometheus "github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -19,6 +21,12 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// @title Inventory Service API
+// @version 1.0
+// @description This is the API server for an inventory service.
+// @host localhost:3004
+// @BasePath /
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -72,6 +80,9 @@ func main() {
 	prome := fiberprometheus.NewWithDefaultRegistry("inventory-service")
 	app.Use(prome.Middleware)
 	prome.RegisterAt(app, "/metrics")
+
+	// Swagger route
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	api := app.Group("/api/v1/inventory")
 

@@ -19,6 +19,14 @@ func NewMenuHandler(menuService service.MenuService, stationService service.Stat
 	return &MenuHandler{menuService: menuService, stationService: stationService}
 }
 
+// GetAllMenuItems godoc
+// @Summary      Get all menu items
+// @Description  Get a list of all menu items
+// @Tags         menus
+// @Produce      json
+// @Success      200  {object}  map[string][]model.MenuItem
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus [get]
 func (h *MenuHandler) GetAllMenuItems(c *fiber.Ctx) error {
 	items, err := h.menuService.GetAllMenuItems()
 	if err != nil {
@@ -29,6 +37,16 @@ func (h *MenuHandler) GetAllMenuItems(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"menu_items": items})
 }
 
+// GetMenuItemByID godoc
+// @Summary      Get a menu item by ID
+// @Description  Get detailed information about a specific menu item by its ID
+// @Tags         menus
+// @Produce      json
+// @Param        id   path      int  true  "Menu Item ID"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      404  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id} [get]
 func (h *MenuHandler) GetMenuItemByID(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -52,6 +70,17 @@ func (h *MenuHandler) GetMenuItemByID(c *fiber.Ctx) error {
 	})
 }
 
+// CreateMenuItem godoc
+// @Summary      Create a new menu item
+// @Description  Create a new menu item with the provided data
+// @Tags         menus
+// @Accept       json
+// @Produce      json
+// @Param        menu body model.MenuItem true "Menu Item Data"
+// @Success      201  {object}  model.MenuItem
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus [post]
 func (h *MenuHandler) CreateMenuItem(c *fiber.Ctx) error {
 	item := new(model.MenuItem)
 	if err := c.BodyParser(item); err != nil {
@@ -71,6 +100,18 @@ func (h *MenuHandler) CreateMenuItem(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(item)
 }
 
+// UpdateMenuItem godoc
+// @Summary      Update a menu item
+// @Description  Update an existing menu item by its ID
+// @Tags         menus
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int            true  "Menu Item ID"
+// @Param        menu body      model.MenuItem true "Updated Menu Item Data"
+// @Success      200  {object}  model.MenuItem
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      404  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id} [put]
 func (h *MenuHandler) UpdateMenuItem(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -92,6 +133,15 @@ func (h *MenuHandler) UpdateMenuItem(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
+// DeleteMenuItem godoc
+// @Summary      Delete a menu item
+// @Description  Delete a menu item by its ID
+// @Tags         menus
+// @Param        id   path      int  true  "Menu Item ID"
+// @Success      204  "No Content"
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      404  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id} [delete]
 func (h *MenuHandler) DeleteMenuItem(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {

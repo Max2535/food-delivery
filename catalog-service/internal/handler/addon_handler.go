@@ -19,6 +19,16 @@ func NewAddOnHandler(service service.AddOnService) *AddOnHandler {
 }
 
 // GET /api/v1/catalog/menus/:id/addons
+// GetAddOns godoc
+// @Summary      Get add-ons by Menu Item ID
+// @Description  Get the optional extras for a specific menu item
+// @Tags         addons
+// @Produce      json
+// @Param        id   path      int  true  "Menu Item ID"
+// @Success      200  {object}  map[string][]model.MenuAddOn
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id}/addons [get]
 func (h *AddOnHandler) GetAddOns(c *fiber.Ctx) error {
 	menuItemID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -34,6 +44,17 @@ func (h *AddOnHandler) GetAddOns(c *fiber.Ctx) error {
 }
 
 // POST /api/v1/catalog/menus/:id/addons
+// CreateAddOn godoc
+// @Summary      Create an add-on
+// @Description  Create a new optional extra for a menu item
+// @Tags         addons
+// @Accept       json
+// @Produce      json
+// @Param        id    path      int              true  "Menu Item ID"
+// @Param        addon body      model.MenuAddOn  true  "Add-on Data"
+// @Success      201   {object}  model.MenuAddOn
+// @Failure      400   {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id}/addons [post]
 func (h *AddOnHandler) CreateAddOn(c *fiber.Ctx) error {
 	menuItemID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -56,6 +77,15 @@ func (h *AddOnHandler) CreateAddOn(c *fiber.Ctx) error {
 }
 
 // DELETE /api/v1/catalog/menus/:id/addons/:addon_id
+// DeleteAddOn godoc
+// @Summary      Delete an add-on
+// @Description  Delete an optional extra by its ID
+// @Tags         addons
+// @Param        addon_id path      int  true  "Add-on ID"
+// @Success      204      "No Content"
+// @Failure      400      {object}  map[string]interface{}
+// @Failure      404      {object}  map[string]interface{}
+// @Router       /api/v1/catalog/addons/{addon_id} [delete]
 func (h *AddOnHandler) DeleteAddOn(c *fiber.Ctx) error {
 	addonID, err := strconv.Atoi(c.Params("addon_id"))
 	if err != nil {

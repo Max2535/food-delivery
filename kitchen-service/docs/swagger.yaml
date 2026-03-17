@@ -1,0 +1,102 @@
+basePath: /
+definitions:
+  handler.UpdateRequest:
+    properties:
+      status:
+        example: Ready
+        type: string
+    type: object
+  model.KitchenTicket:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      items:
+        description: รายการอาหาร (อาจจะเก็บเป็น JSON string)
+        type: string
+      order_id:
+        type: integer
+      status:
+        description: '"Received", "Cooking", "Ready"'
+        type: string
+    type: object
+host: localhost:3005
+info:
+  contact: {}
+  description: This is the API server for a kitchen service.
+  title: Kitchen Service API
+  version: "1.0"
+paths:
+  /api/v1/kitchen/tickets:
+    post:
+      consumes:
+      - application/json
+      description: Receive order data from Order Service to create a new kitchen work
+        order
+      parameters:
+      - description: Ticket Data
+        in: body
+        name: ticket
+        required: true
+        schema:
+          $ref: '#/definitions/model.KitchenTicket'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.KitchenTicket'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a kitchen ticket
+      tags:
+      - kitchen
+  /api/v1/kitchen/tickets/{orderId}:
+    patch:
+      consumes:
+      - application/json
+      description: Update the status of a kitchen ticket (e.g., to 'Ready')
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: integer
+      - description: New Status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update ticket status
+      tags:
+      - kitchen
+swagger: "2.0"

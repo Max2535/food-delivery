@@ -13,9 +13,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
+	_ "auth-service/docs" // Swagger docs
+	swagger "github.com/gofiber/swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// @title Auth Service API
+// @version 1.0
+// @description This is the API server for an auth service.
+// @host localhost:3005
+// @BasePath /
 
 func main() {
 	// Load .env
@@ -63,6 +71,9 @@ func main() {
 	prometheus := fiberprometheus.NewWithDefaultRegistry("auth-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
+
+	// Swagger route
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Routes
 	api := app.Group("/api")
