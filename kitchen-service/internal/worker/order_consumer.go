@@ -69,6 +69,12 @@ func StartOrderConsumer(kitchenSvc service.KitchenService) {
 
 			itemsStr, _ := data["items"].(string)
 
+			priorityFloat, ok := data["priority"].(float64)
+			priority := 0
+			if ok {
+				priority = int(priorityFloat)
+			}
+
 			correlationID := d.CorrelationId
 			if correlationID == "" {
 				correlationID = "unknown"
@@ -78,11 +84,13 @@ func StartOrderConsumer(kitchenSvc service.KitchenService) {
 				Str("service", "kitchen-service").
 				Str("correlation_id", correlationID).
 				Uint("order_id", orderID).
+				Int("priority", priority).
 				Msg("Kitchen received new order")
 
 			ticket := &model.KitchenTicket{
-				OrderID: orderID,
-				Items:   itemsStr,
+				OrderID:  orderID,
+				Items:    itemsStr,
+				Priority: priority,
 			}
 
 			if err := kitchenSvc.CreateTicket(ticket); err != nil {

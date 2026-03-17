@@ -35,9 +35,17 @@ func (m *MockKitchenRepository) GetByOrderID(orderID uint) (*model.KitchenTicket
 	return args.Get(0).(*model.KitchenTicket), args.Error(1)
 }
 
+func (m *MockKitchenRepository) GetQueue() ([]*model.KitchenTicket, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*model.KitchenTicket), args.Error(1)
+}
+
 // --- Tests ---
 
-func TestCreateTicket_SetsStatusReceived(t *testing.T) {
+func TestCreateTicket_SetsStatusPending(t *testing.T) {
 	mockRepo := new(MockKitchenRepository)
 	svc := service.NewKitchenService(mockRepo)
 
@@ -47,7 +55,8 @@ func TestCreateTicket_SetsStatusReceived(t *testing.T) {
 	err := svc.CreateTicket(ticket)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "Received", ticket.Status) // Service must set status to "Received"
+	assert.Equal(t, model.StatusPending, ticket.Status) // Service must set status to "Pending"
+	assert.Equal(t, model.PriorityNormal, ticket.Priority) // Must default to Normal
 	mockRepo.AssertExpectations(t)
 }
 
@@ -92,10 +101,10 @@ func TestUpdateStatus_Ready_LogsEvent(t *testing.T) {
 	mockRepo := new(MockKitchenRepository)
 	svc := service.NewKitchenService(mockRepo)
 
-	// When status is "Ready", service should still succeed and log the event
-	mockRepo.On("UpdateStatus", uint(3), "Ready").Return(nil)
+	// When status is "Ready to Serve", service should still succeed and log the event
+	mockRepo.On("UpdateStatus", uint(3), model.StatusReadyToServe).Return(nil)
 
-	err := svc.UpdateStatus(3, "Ready")
+	err := svc.UpdateStatus(3, model.StatusReadyToServe)
 
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
