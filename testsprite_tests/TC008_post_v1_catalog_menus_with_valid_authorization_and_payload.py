@@ -1,66 +1,92 @@
 import requests
+import uuid
 
-endpoint = "http://localhost:8080"
-timeout = 30
+BASE_URL = "http://localhost:8080"
+TIMEOUT = 30
+
+# Credentials for test user
+test_username = f"testuser_{uuid.uuid4()}"
+test_password = "StrongPass!123"
+test_email = f"{test_username}@example.com"
+
+
+def get_jwt_token(username, password):
+    login_url = f"{BASE_URL}/v1/auth/login"
+    login_payload = {
+        "username": username,
+        "password": password
+    }
+    resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
+    assert resp.status_code == 200, f"Login failed with status {resp.status_code} and response {resp.text}"
+    data = resp.json()
+    assert "token" in data, "Login response does not contain 'token'"
+    token = data["token"]
+    assert isinstance(token, str) and token.strip() != "", "JWT token is empty or not a string"
+    return token
+
+
+def register_user(username, password, email):
+    register_url = f"{BASE_URL}/v1/auth/register"
+    register_payload = {
+        "username": username,
+        "password": password,
+        "email": email
+    }
+    resp = requests.post(register_url, json=register_payload, timeout=TIMEOUT)
+    assert resp.status_code == 201, f"User registration failed with status {resp.status_code} and response {resp.text}"
+    data = resp.json()
+    assert "user_id" in data, "Registration response does not contain 'user_id'"
+    user_id = data["user_id"]
+    assert isinstance(user_id, str) and user_id.strip() != "", "user_id is empty or not a string"
+    return user_id
+
 
 def test_post_v1_catalog_menus_with_valid_authorization_and_payload():
-    # This token should be replaced with a valid JWT token for testing
-    jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ValidTestTokenExample"
+    # Register a new user
+    register_user(test_username, test_password, test_email)
 
+    # Login to get a valid JWT token
+    token = get_jwt_token(test_username, test_password)
+
+    url = f"{BASE_URL}/v1/catalog/menus"
     headers = {
-        "Authorization": f"Bearer {jwt_token}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-
-    menu_payload = {
-        "name": "Test Menu Item",
-        "price": 9.99,
-        "category": "Main Course",
+    unique_name = f"Test Menu {uuid.uuid4()}"
+    payload = {
+        "name": unique_name,
+        "description": "A test menu item created during automated testing.",
+        "price": 12.99,
+        "category": "Test Category",
         "availability": True,
-        "description": "A delicious test menu item",
-        "bom": [  # Bill of Materials example - ingredient or sub_menu_item references
+        "bom": [
             {
-                "ingredient_id": None,
-                "sub_menu_item_id": None,
-                "quantity": 1
+                "ingredient_id": "ingredient-uuid-example-1234",
+                "quantity": 1.0,
+                "unit": "pcs"
             }
         ]
     }
 
-    # Because the PRD does not specify full schema, adjust payload elements to plausible keys
-    # Remove bom entry to valid minimal menu payload that should be accepted (assumed optional)
-    # Or fix bom entry to valid one (ingredient_id or sub_menu_item_id must be set)
-    # We'll fix bom entry by setting only ingredient_id to an example UUID string as string or number
-    menu_payload["bom"] = [
-        {
-            "ingredient_id": "123e4567-e89b-12d3-a456-426614174000",
-            "sub_menu_item_id": None,
-            "quantity": 2
-        }
-    ]
-
-    created_menu_id = None
+    menu_id = None
     try:
-        response = requests.post(
-            f"{endpoint}/v1/catalog/menus",
-            headers=headers,
-            json=menu_payload,
-            timeout=timeout
-        )
-        assert response.status_code == 201, f"Expected 201, got {response.status_code}: {response.text}"
+        response = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
+        assert response.status_code == 201, f"Expected 201, got {response.status_code}, response: {response.text}"
         resp_json = response.json()
         assert "menu_id" in resp_json, "Response JSON does not contain 'menu_id'"
-        created_menu_id = resp_json["menu_id"]
+        menu_id = resp_json["menu_id"]
+        assert isinstance(menu_id, str) and menu_id.strip() != "", "'menu_id' is empty or not a string"
     finally:
-        if created_menu_id:
+        if menu_id:
+            delete_url = f"{BASE_URL}/v1/catalog/menus/{menu_id}"
             try:
-                del_response = requests.delete(
-                    f"{endpoint}/v1/catalog/menus/{created_menu_id}",
-                    headers=headers,
-                    timeout=timeout
-                )
-                # It's OK if delete fails here, no assertion raised
+                delete_headers = {
+                    "Authorization": f"Bearer {token}"
+                }
+                requests.delete(delete_url, headers=delete_headers, timeout=TIMEOUT)
             except Exception:
                 pass
+
 
 test_post_v1_catalog_menus_with_valid_authorization_and_payload()

@@ -17,11 +17,11 @@
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 25, in <module>
-  File "<string>", line 18, in test_post_v1_auth_register_with_valid_data
-AssertionError: Expected status code 201, got 200
+  File "<string>", line 36, in <module>
+  File "<string>", line 28, in test_post_v1_auth_register_with_valid_data
+AssertionError: Response JSON does not contain 'user_id'
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/86610364-1fad-4439-bc40-d03f7f14643c
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/0441c38d-3051-4d4f-9e3c-04989dc4fd03
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -29,36 +29,21 @@ AssertionError: Expected status code 201, got 200
 #### Test TC002 post v1 auth login with valid credentials
 - **Test Code:** [TC002_post_v1_auth_login_with_valid_credentials.py](./TC002_post_v1_auth_login_with_valid_credentials.py)
 - **Test Error:** Traceback (most recent call last):
-  File "<string>", line 17, in test_post_v1_auth_login_with_valid_credentials
-  File "/var/task/requests/models.py", line 1024, in raise_for_status
-    raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: http://localhost:8080/v1/auth/login
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 28, in <module>
-  File "<string>", line 19, in test_post_v1_auth_login_with_valid_credentials
-AssertionError: Request failed: 500 Server Error: Internal Server Error for url: http://localhost:8080/v1/auth/login
+  File "<string>", line 35, in <module>
+  File "<string>", line 24, in test_post_v1_auth_login_with_valid_credentials
+AssertionError: Expected status code 200, got 401
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/b1fbfdc8-ba6a-4aa4-81f8-dabca58a2630
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/6a5e0eb3-acdd-42b8-b5ce-35339b713a7c
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC003 post v1 auth login with invalid credentials
 - **Test Code:** [TC003_post_v1_auth_login_with_invalid_credentials.py](./TC003_post_v1_auth_login_with_invalid_credentials.py)
-- **Test Error:** Traceback (most recent call last):
-  File "/var/task/handler.py", line 258, in run_with_retry
-    exec(code, exec_env)
-  File "<string>", line 22, in <module>
-  File "<string>", line 20, in test_post_v1_auth_login_with_invalid_credentials
-AssertionError: Expected 401 Unauthorized, got 500
-
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/fb76e7d0-2669-41c7-8ed9-5ffdbcd15fb9
-- **Status:** ❌ Failed
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/dd5b4165-023f-4fe6-ad26-70522c9f1f07
+- **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
@@ -67,18 +52,18 @@ AssertionError: Expected 401 Unauthorized, got 500
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 58, in <module>
-  File "<string>", line 19, in test_post_v1_orders_with_valid_authorization_and_payload
-AssertionError: Login failed with status code 500
+  File "<string>", line 55, in <module>
+  File "<string>", line 17, in test_post_v1_orders_with_valid_authorization_and_payload
+AssertionError: Expected 200 OK on login, got 401
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/9e4a60df-96e1-4e35-87f2-f97c74f3db3d
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/9bb27405-ad7d-4e6d-9423-9e7257423b4f
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC005 post v1 orders without authorization header
 - **Test Code:** [TC005_post_v1_orders_without_authorization_header.py](./TC005_post_v1_orders_without_authorization_header.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/d1fe9043-8cce-4c00-a7dc-2a538f8f3fbd
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/972765da-697e-4125-b1a2-15cb62688f9a
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -86,13 +71,21 @@ AssertionError: Login failed with status code 500
 #### Test TC006 get v1 kitchen status with valid order id
 - **Test Code:** [TC006_get_v1_kitchen_status_with_valid_order_id.py](./TC006_get_v1_kitchen_status_with_valid_order_id.py)
 - **Test Error:** Traceback (most recent call last):
+  File "<string>", line 26, in test_get_v1_kitchen_status_with_valid_order_id
+  File "/var/task/requests/models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: http://localhost:8080/v1/auth/login
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 69, in <module>
-  File "<string>", line 25, in test_get_v1_kitchen_status_with_valid_order_id
-AssertionError: Login failed with status 500
+  File "<string>", line 81, in <module>
+  File "<string>", line 30, in test_get_v1_kitchen_status_with_valid_order_id
+AssertionError: Failed to login to get token: 401 Client Error: Unauthorized for url: http://localhost:8080/v1/auth/login
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/eba76bac-01d2-41b5-bfca-a5132e720fc6
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/c406c77f-017f-4f10-8c21-44059f1ced62
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -102,11 +95,11 @@ AssertionError: Login failed with status 500
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 16, in <module>
-  File "<string>", line 14, in test_get_v1_kitchen_status_with_nonexistent_order_id
-AssertionError: Expected 404 Not Found, got 500
+  File "<string>", line 22, in <module>
+  File "<string>", line 17, in test_get_kitchen_status_with_nonexistent_order_id
+AssertionError: Expected status code 404, got 400. Response body: {"error":"OrderID ไม่ถูกต้อง"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/4ab91180-7f3e-40ee-a141-e6916255a4f6
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/91f765af-f4c1-4717-b00b-91ff05bb6084
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -116,11 +109,12 @@ AssertionError: Expected 404 Not Found, got 500
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 66, in <module>
-  File "<string>", line 50, in test_post_v1_catalog_menus_with_valid_authorization_and_payload
-AssertionError: Expected 201, got 401: 
+  File "<string>", line 92, in <module>
+  File "<string>", line 46, in test_post_v1_catalog_menus_with_valid_authorization_and_payload
+  File "<string>", line 38, in register_user
+AssertionError: Registration response does not contain 'user_id'
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/c37b6b36-4200-44dc-a582-0c1a85026faf
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/309b398d-0642-4a23-9fbd-7d812388b77a
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -130,11 +124,11 @@ AssertionError: Expected 201, got 401:
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 39, in <module>
-  File "<string>", line 34, in test_post_v1_catalog_menus_with_invalid_bom_entry
-AssertionError: Expected 400 Bad Request, got 401
+  File "<string>", line 81, in <module>
+  File "<string>", line 25, in test_post_v1_catalog_menus_with_invalid_bom_entry
+AssertionError: Login failed with status 401
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/43dcd980-a74c-46d8-9eac-363cc9c4cddd
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/376c49dd-6d80-4f33-9581-136463e9fdf9
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -142,19 +136,22 @@ AssertionError: Expected 400 Bad Request, got 401
 #### Test TC010 post v1 inventory stock restock with valid authorization and payload
 - **Test Code:** [TC010_post_v1_inventory_stock_restock_with_valid_authorization_and_payload.py](./TC010_post_v1_inventory_stock_restock_with_valid_authorization_and_payload.py)
 - **Test Error:** Traceback (most recent call last):
-  File "<string>", line 17, in test_post_v1_inventory_stock_restock_with_valid_authorization_and_payload
-AssertionError: No materials found to restock.
+  File "<string>", line 15, in get_jwt_token
+  File "/var/task/requests/models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: http://localhost:8080/v1/auth/login
 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 47, in <module>
-  File "<string>", line 25, in test_post_v1_inventory_stock_restock_with_valid_authorization_and_payload
-AssertionError: Failed to retrieve materials or find valid material_id: No materials found to restock.
+  File "<string>", line 64, in <module>
+  File "<string>", line 41, in test_post_v1_inventory_stock_restock_with_valid_authorization_and_payload
+  File "<string>", line 21, in get_jwt_token
+RuntimeError: Failed to get JWT token: 401 Client Error: Unauthorized for url: http://localhost:8080/v1/auth/login
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/019e3921-4376-48c2-a3d1-1569c08b22b5/bd9cc87c-e32d-4577-a152-4c55d7b8a9ac
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/c9909424-ab57-4b08-bc40-19887e02053a/5866c489-a31f-4587-9060-c47c83e1e5b9
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -162,7 +159,7 @@ AssertionError: Failed to retrieve materials or find valid material_id: No mater
 
 ## 3️⃣ Coverage & Matching Metrics
 
-- **10.00** of tests passed
+- **20.00** of tests passed
 
 | Requirement        | Total Tests | ✅ Passed | ❌ Failed  |
 |--------------------|-------------|-----------|------------|

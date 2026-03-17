@@ -1,69 +1,81 @@
 import requests
 import uuid
-import time
 
 BASE_URL = "http://localhost:8080"
-AUTH_URL = f"{BASE_URL}/v1/auth/login"
-ORDER_URL = f"{BASE_URL}/v1/orders"
-KITCHEN_STATUS_URL = f"{BASE_URL}/v1/kitchen/status"
+TIMEOUT = 30
 
-USERNAME = "testuser"
-PASSWORD = "TestPass123!"
+# Using a placeholder JWT token since no credentials given to fetch an actual one
+# For real testing, this token should be obtained via login and securely passed
+# According to PRD, GET /v1/kitchen/status/{order_id} does not require auth.
+# But per instructions, authType is Bearer token globally, so we send it if needed.
+# Here we omit Authorization as per PRD endpoint spec (auth_required: false).
+# If needed uncomment below and provide a valid token.
+# AUTH_TOKEN = "Bearer <your-valid-jwt-token>"
 
 def test_get_v1_kitchen_status_with_valid_order_id():
-    timeout = 30
-    # Step 1: Authenticate to get JWT token
+    # Step 1: Create an order to get a valid order_id
+    # Need to authenticate first to create an order (POST /v1/auth/login)
+    # We'll do a login with a test user (credentials should be replaced with valid ones)
+    login_url = f"{BASE_URL}/v1/auth/login"
     login_payload = {
-        "username": USERNAME,
-        "password": PASSWORD
+        "username": "testuser",
+        "password": "testpassword"
     }
-    token = None
-    order_id = None
-    headers = {"Content-Type": "application/json"}
     try:
-        login_resp = requests.post(AUTH_URL, json=login_payload, headers=headers, timeout=timeout)
-        assert login_resp.status_code == 200, f"Login failed with status {login_resp.status_code}"
-        token = login_resp.json().get("token")
-        assert token, "JWT token not found in login response"
+        login_resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
+        login_resp.raise_for_status()
+        jwt_token = login_resp.json().get("token")
+        assert jwt_token, "Login response missing token"
+    except Exception as e:
+        raise AssertionError(f"Failed to login to get token: {e}")
 
-        auth_headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+    headers_auth = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json"
+    }
 
-        # Step 2: Create a new order with valid payload
-        order_payload = {
-            "customer_id": str(uuid.uuid4()),
-            "items": [
-                {"menu_item_id": str(uuid.uuid4()), "quantity": 1, "portion_multiplier": 1.0}
-            ],
-            "total_amount": 10.0
-        }
+    # Create an order
+    orders_url = f"{BASE_URL}/v1/orders"
+    order_payload = {
+        "customer_id": str(uuid.uuid4()),
+        "items": [
+            {
+                "menu_item_id": "sample-menu-item-id",
+                "quantity": 1,
+                "portion_multiplier": 1.0
+            }
+        ],
+        "total_amount": 9.99
+    }
 
-        order_resp = requests.post(ORDER_URL, json=order_payload, headers=auth_headers, timeout=timeout)
-        assert order_resp.status_code == 201, f"Order creation failed with status {order_resp.status_code}"
-        order_resp_json = order_resp.json()
-        order_id = order_resp_json.get("order_id")
-        assert order_id, "order_id not found in order creation response"
+    order_id = None
+    try:
+        order_resp = requests.post(orders_url, headers=headers_auth, json=order_payload, timeout=TIMEOUT)
+        order_resp.raise_for_status()
+        assert order_resp.status_code == 201, f"Expected 201 Created but got {order_resp.status_code}"
+        order_json = order_resp.json()
+        order_id = order_json.get("order_id")
+        assert order_id, "Response missing order_id"
 
-        # Allow some time for kitchen ticket to be created
-        time.sleep(2)
-
-        # Step 3: Get kitchen ticket status by order_id
-        kitchen_status_resp = requests.get(f"{KITCHEN_STATUS_URL}/{order_id}", timeout=timeout)
-        assert kitchen_status_resp.status_code == 200, f"Kitchen status fetch failed with status {kitchen_status_resp.status_code}"
-        kitchen_status_json = kitchen_status_resp.json()
-
-        # Validate kitchen ticket status and ticket details presence
-        assert "status" in kitchen_status_json, "'status' key missing in kitchen status response"
-        assert kitchen_status_json["status"] in ["Received", "Cooking", "Ready"], "Invalid kitchen status value"
-        assert "ticket" in kitchen_status_json, "'ticket' key missing in kitchen status response"
-        assert isinstance(kitchen_status_json["ticket"], dict), "Ticket details should be a dictionary"
-
+        # Now test GET /v1/kitchen/status/{order_id}
+        # Per PRD, no auth required for this endpoint
+        kitchen_status_url = f"{BASE_URL}/v1/kitchen/status/{order_id}"
+        kitchen_resp = requests.get(kitchen_status_url, timeout=TIMEOUT)
+        kitchen_resp.raise_for_status()
+        assert kitchen_resp.status_code == 200, f"Expected 200 OK but got {kitchen_resp.status_code}"
+        kitchen_json = kitchen_resp.json()
+        # Validate kitchen ticket status presence and value
+        status = kitchen_json.get("status")
+        assert status in {"Received", "Cooking", "Ready"}, f"Unexpected kitchen status '{status}'"
+        # Validate ticket details presence
+        ticket = kitchen_json.get("ticket")
+        assert ticket is not None, "Missing ticket details"
+        # Validate ticket has items array
+        items = ticket.get("items")
+        assert isinstance(items, list), "Ticket items should be a list"
     finally:
-        # Cleanup: delete the created order if possible
-        if token and order_id:
-            # No explicit delete order endpoint described in PRD, skipping deletion
-            pass
+        # Cleanup - delete the created order if an endpoint existed; since there's no order delete endpoint in PRD, skip
+        # If needed to clean, implement delete here
+        pass
 
 test_get_v1_kitchen_status_with_valid_order_id()

@@ -9,3 +9,22 @@ CREATE DATABASE kitchen_db;
 CREATE DATABASE auth_db;
 CREATE DATABASE catalog_db;
 CREATE DATABASE inventory_db;
+
+\c inventory_db;
+CREATE TABLE IF NOT EXISTS materials (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    quantity DECIMAL NOT NULL DEFAULT 0,
+    unit VARCHAR(50) NOT NULL,
+    min_stock DECIMAL NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+INSERT INTO materials (name, quantity, unit, min_stock) VALUES 
+('Rice', 100, 'kg', 10),
+('Chicken', 50, 'kg', 5),
+('Egg', 200, 'pcs', 20)
+ON CONFLICT (name) DO NOTHING;
+

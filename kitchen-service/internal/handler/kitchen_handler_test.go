@@ -32,6 +32,14 @@ func (m *MockKitchenService) UpdateStatus(orderID uint, status string) error {
 	return args.Error(0)
 }
 
+func (m *MockKitchenService) GetByOrderID(orderID uint) (*model.KitchenTicket, error) {
+	args := m.Called(orderID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.KitchenTicket), args.Error(1)
+}
+
 // --- Helper ---
 
 func setupApp(svc *MockKitchenService) *fiber.App {
@@ -40,6 +48,7 @@ func setupApp(svc *MockKitchenService) *fiber.App {
 	api := app.Group("/api/v1/kitchen")
 	api.Post("/tickets", h.CreateTicket)
 	api.Patch("/tickets/:orderId", h.UpdateStatus)
+	api.Get("/orders/:orderId", h.GetStatus)
 	return app
 }
 

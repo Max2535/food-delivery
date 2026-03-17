@@ -10,6 +10,7 @@ import (
 type KitchenService interface {
     CreateTicket(ticket *model.KitchenTicket) error
     UpdateStatus(orderID uint, status string) error
+    GetByOrderID(orderID uint) (*model.KitchenTicket, error)
 }
 
 type kitchenService struct {
@@ -34,4 +35,8 @@ func (s *kitchenService) UpdateStatus(orderID uint, status string) error {
         // PublishOrderReadyEvent(orderID) <- ฟังก์ชันที่เขียนค้างไว้คราวก่อน
     }
     return err
+}
+
+func (s *kitchenService) GetByOrderID(orderID uint) (*model.KitchenTicket, error) {
+    return s.repo.GetByOrderID(orderID)
 }

@@ -4,21 +4,19 @@ BASE_URL = "http://localhost:8080"
 ORDERS_PATH = "/v1/orders"
 TIMEOUT = 30
 
-def test_post_v1_orders_without_authorization_header():
+
+def test_post_v1_orders_without_authorization():
     url = BASE_URL + ORDERS_PATH
+    payload = {
+        "customer_id": "test_customer_123",
+        "items": [
+            {"menu_item_id": "item_001", "quantity": 2},
+            {"menu_item_id": "item_002", "quantity": 1}
+        ],
+        "total_amount": 29.99
+    }
     headers = {
         "Content-Type": "application/json"
-    }
-    # Minimal valid order payload based on PRD (customer_id, items, total_amount required)
-    payload = {
-        "customer_id": "test-customer-123",
-        "items": [
-            {
-                "menu_item_id": "item-001",
-                "quantity": 1
-            }
-        ],
-        "total_amount": 9.99
     }
 
     try:
@@ -26,7 +24,8 @@ def test_post_v1_orders_without_authorization_header():
     except requests.RequestException as e:
         assert False, f"Request failed: {e}"
 
-    # Expect 401 Unauthorized
-    assert response.status_code == 401, f"Expected 401 Unauthorized but got {response.status_code}"
+    assert response.status_code == 401, f"Expected 401 Unauthorized, got {response.status_code}"
+    # Optionally test for response body or headers related to unauthorized response if applicable
 
-test_post_v1_orders_without_authorization_header()
+
+test_post_v1_orders_without_authorization()

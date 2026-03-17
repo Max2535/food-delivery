@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"kitchen-service/internal/model"
 	"kitchen-service/internal/service"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 type KitchenHandler struct {
@@ -44,15 +46,11 @@ func (h *KitchenHandler) CreateTicket(c *fiber.Ctx) error {
 		})
 	}
 
-	correlationID := c.Get("X-Correlation-ID")
-	if correlationID == "" {
-		correlationID = "unknown"
-	}
-
+	correlationID := c.Get("X-Correlation-ID", "unknown")
 	log.Info().
 		Str("service", "kitchen-service").
 		Str("order_id", fmt.Sprint(ticket.OrderID)).
-		Str("correlation_id", correlationID). // สำคัญมากสำหรับการแกะรอย
+		Str("correlation_id", correlationID).
 		Msg("Ticket created successfully")
 
 	return c.Status(fiber.StatusCreated).JSON(ticket)
@@ -110,8 +108,33 @@ func (h *KitchenHandler) UpdateStatus(c *fiber.Ctx) error {
 		Msg("Ticket status updated")
 
 	return c.JSON(fiber.Map{
-		"message": "อัปเดตสถานะเรียบร้อยแล้ว",
+		"message":  "อัปเดตสถานะเรียบร้อยแล้ว",
 		"order_id": orderID,
 		"status":   req.Status,
 	})
+}
+
+// GetStatus ใช้สำหรับเช็คสถานะออเดอร์ในครัว
+func (h *KitchenHandler) GetStatus(c *fiber.Ctx) error {
+	orderIDStr := c.Params("orderId")
+	orderID, err := strconv.ParseUint(orderIDStr, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "OrderID ไม่ถูกต้อง",
+		})
+	}
+
+	ticket, err := h.service.GetByOrderID(uint(orderID))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "ไม่พบรายการในครัว",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "เกิดข้อผิดพลาดในการค้นหารายการ",
+		})
+	}
+
+	return c.JSON(ticket)
 }
