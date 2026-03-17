@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8080",
+  "backendAuthType": "Bearer token",
+  "executionArgs": {
+    "projectName": "food-delivery",
+    "projectPath": "d:\\go-lang\\food-delivery",
+    "testIds": [],
+    "additionalInstruction": "",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-dXz1uKT7z7K5rcPgYpnInJNctxH9RWPulXyP8GzI8XSeK0mAW4zrdqMx_79vg9Q1W-Rmb3RNjrqs_HCEjFeh_LkF6gMVUJyLZ4_WrxmVeD1BY7Q5sf5qxbIynauy4Z_RhjM"
+    }
+  },
+  "serverPort": 64106,
+  "proxy": "http://21afd428-d5fb-449a-9fbf-802a37b49cc6:pWGarm3Pz50pqRFjdNWPZpLxijonyy1C@tun.testsprite.com:8080"
+}

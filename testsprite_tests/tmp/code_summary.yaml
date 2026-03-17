@@ -1,0 +1,69 @@
+version: "2"
+type: backend
+tech_stack:
+  - go
+  - postgresql
+  - rabbitmq
+  - redis
+  - krakend
+features:
+  - name: Order Management
+    description: Creating and managing food orders
+    endpoints:
+      - method: POST
+        path: /v1/orders
+        description: Create a new order
+        auth_required: true
+  - name: Kitchen Operations
+    description: Managing order preparation in the kitchen
+    endpoints:
+      - method: GET
+        path: /v1/kitchen/status/{id}
+        description: Get kitchen status for an order
+        auth_required: false
+  - name: Catalog Management
+    description: Managing menus, choices, addons, and portions
+    endpoints:
+      - method: GET
+        path: /v1/catalog/menus
+        description: List menus
+        auth_required: false
+      - method: POST
+        path: /v1/catalog/menus
+        description: Create a menu
+        auth_required: true
+      - method: GET
+        path: /v1/catalog/ingredients
+        description: List ingredients
+        auth_required: false
+      - method: POST
+        path: /v1/catalog/ingredients
+        description: Create an ingredient
+        auth_required: true
+  - name: Inventory Management
+    description: Tracking materials and stock
+    endpoints:
+      - method: GET
+        path: /v1/inventory/materials
+        description: List materials
+        auth_required: false
+      - method: POST
+        path: /v1/inventory/stock/restock
+        description: Restock materials
+        auth_required: true
+      - method: GET
+        path: /v1/inventory/transactions
+        description: View inventory transactions
+        auth_required: true
+  - name: Authentication
+    description: User registration and login
+    endpoints:
+      - method: POST
+        path: /v1/auth/login
+        description: User login
+        auth_required: false
+      - method: POST
+        path: /v1/auth/register
+        description: User registration
+        auth_required: false
+known_limitations: []

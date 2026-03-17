@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "post v1 auth register with valid data",
+    "description": "Test user registration by sending a POST request to /v1/auth/register with valid username, password, and email. Expect a 201 Created response with a user_id in the response body."
+  },
+  {
+    "id": "TC002",
+    "title": "post v1 auth login with valid credentials",
+    "description": "Test user login by sending a POST request to /v1/auth/login with valid username and password. Expect a 200 OK response with a JWT token in the response body."
+  },
+  {
+    "id": "TC003",
+    "title": "post v1 auth login with invalid credentials",
+    "description": "Test user login failure by sending a POST request to /v1/auth/login with invalid username or password. Expect a 401 Unauthorized response."
+  },
+  {
+    "id": "TC004",
+    "title": "post v1 orders with valid authorization and payload",
+    "description": "Test order creation by sending a POST request to /v1/orders with a valid JWT token in the Authorization header and a valid order payload containing customer_id, items, and total_amount. Expect a 201 Created response with an order_id."
+  },
+  {
+    "id": "TC005",
+    "title": "post v1 orders without authorization header",
+    "description": "Test order creation without authentication by sending a POST request to /v1/orders without an Authorization header. Expect a 401 Unauthorized response."
+  },
+  {
+    "id": "TC006",
+    "title": "get v1 kitchen status with valid order id",
+    "description": "Test retrieving kitchen ticket status by sending a GET request to /v1/kitchen/status/{order_id} with a valid order_id. Expect a 200 OK response with kitchen ticket status and ticket details."
+  },
+  {
+    "id": "TC007",
+    "title": "get v1 kitchen status with nonexistent order id",
+    "description": "Test retrieving kitchen ticket status for a nonexistent order by sending a GET request to /v1/kitchen/status/{nonexistent_order_id}. Expect a 404 Not Found response."
+  },
+  {
+    "id": "TC008",
+    "title": "post v1 catalog menus with valid authorization and payload",
+    "description": "Test creating a menu by sending a POST request to /v1/catalog/menus with a valid JWT token and a valid menu payload. Expect a 201 Created response with a menu_id."
+  },
+  {
+    "id": "TC009",
+    "title": "post v1 catalog menus with invalid bom entry",
+    "description": "Test menu creation failure by sending a POST request to /v1/catalog/menus with a valid JWT token but an invalid BOM entry where both ingredient_id and sub_menu_item_id are set or both are null. Expect a 400 Bad Request response."
+  },
+  {
+    "id": "TC010",
+    "title": "post v1 inventory stock restock with valid authorization and payload",
+    "description": "Test restocking inventory by sending a POST request to /v1/inventory/stock/restock with a valid JWT token and a valid restock payload containing material_id, quantity, and note. Expect a 200 Created response with a transaction_id."
+  }
+]
