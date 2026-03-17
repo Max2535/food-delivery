@@ -19,6 +19,16 @@ func NewChoiceHandler(service service.ChoiceService) *ChoiceHandler {
 }
 
 // GET /api/v1/catalog/menus/:id/choices
+// GetChoices godoc
+// @Summary      Get choices by Menu Item ID
+// @Description  Get the Bill of Materials choice groups for a specific menu item
+// @Tags         choices
+// @Produce      json
+// @Param        id   path      int  true  "Menu Item ID"
+// @Success      200  {object}  map[string][]model.BOMChoiceGroup
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id}/choices [get]
 func (h *ChoiceHandler) GetChoices(c *fiber.Ctx) error {
 	menuItemID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -34,6 +44,17 @@ func (h *ChoiceHandler) GetChoices(c *fiber.Ctx) error {
 }
 
 // POST /api/v1/catalog/menus/:id/choices
+// CreateChoiceGroup godoc
+// @Summary      Create a choice group
+// @Description  Create a new BOM choice group for a menu item
+// @Tags         choices
+// @Accept       json
+// @Produce      json
+// @Param        id    path      int                     true  "Menu Item ID"
+// @Param        group body      model.BOMChoiceGroup    true  "Choice Group Data"
+// @Success      201   {object}  model.BOMChoiceGroup
+// @Failure      400   {object}  map[string]interface{}
+// @Router       /api/v1/catalog/menus/{id}/choices [post]
 func (h *ChoiceHandler) CreateChoiceGroup(c *fiber.Ctx) error {
 	menuItemID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -62,6 +83,15 @@ func (h *ChoiceHandler) CreateChoiceGroup(c *fiber.Ctx) error {
 }
 
 // DELETE /api/v1/catalog/menus/:id/choices/:group_id
+// DeleteChoiceGroup godoc
+// @Summary      Delete a choice group
+// @Description  Delete a BOM choice group by its ID
+// @Tags         choices
+// @Param        group_id path      int  true  "Group ID"
+// @Success      204    "No Content"
+// @Failure      400    {object}  map[string]interface{}
+// @Failure      404    {object}  map[string]interface{}
+// @Router       /api/v1/catalog/choices/{group_id} [delete]
 func (h *ChoiceHandler) DeleteChoiceGroup(c *fiber.Ctx) error {
 	groupID, err := strconv.Atoi(c.Params("group_id"))
 	if err != nil {
@@ -82,6 +112,17 @@ type addChoiceOptionRequest struct {
 }
 
 // POST /api/v1/catalog/menus/:id/choices/:group_id/options
+// AddChoiceOption godoc
+// @Summary      Add a choice option
+// @Description  Add an ingredient option to a BOM choice group
+// @Tags         choices
+// @Accept       json
+// @Produce      json
+// @Param        group_id path      int                     true  "Group ID"
+// @Param        req      body      addChoiceOptionRequest  true  "Option Data"
+// @Success      201      {object}  model.BOMChoiceOption
+// @Failure      400      {object}  map[string]interface{}
+// @Router       /api/v1/catalog/choices/{group_id}/options [post]
 func (h *ChoiceHandler) AddChoiceOption(c *fiber.Ctx) error {
 	groupID, err := strconv.Atoi(c.Params("group_id"))
 	if err != nil {
@@ -104,6 +145,15 @@ func (h *ChoiceHandler) AddChoiceOption(c *fiber.Ctx) error {
 }
 
 // DELETE /api/v1/catalog/menus/:id/choices/:group_id/options/:option_id
+// DeleteChoiceOption godoc
+// @Summary      Delete a choice option
+// @Description  Delete a choice option by its ID
+// @Tags         choices
+// @Param        option_id path      int  true  "Option ID"
+// @Success      204       "No Content"
+// @Failure      400       {object}  map[string]interface{}
+// @Failure      404       {object}  map[string]interface{}
+// @Router       /api/v1/catalog/options/{option_id} [delete]
 func (h *ChoiceHandler) DeleteChoiceOption(c *fiber.Ctx) error {
 	optionID, err := strconv.Atoi(c.Params("option_id"))
 	if err != nil {

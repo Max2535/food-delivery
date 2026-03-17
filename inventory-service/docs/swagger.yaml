@@ -1,0 +1,379 @@
+basePath: /
+definitions:
+  handler.adjustRequest:
+    properties:
+      material_id:
+        type: integer
+      note:
+        type: string
+      quantity:
+        description: positive or negative
+        type: number
+    type: object
+  handler.deductRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/service.DeductItem'
+        type: array
+      order_id:
+        type: integer
+    type: object
+  handler.restockRequest:
+    properties:
+      material_id:
+        type: integer
+      note:
+        type: string
+      quantity:
+        type: number
+    type: object
+  model.RawMaterial:
+    properties:
+      catalog_ingredient_id:
+        type: integer
+      created_at:
+        type: string
+      current_stock:
+        type: number
+      id:
+        type: integer
+      name:
+        type: string
+      reorder_point:
+        type: number
+      unit:
+        description: g, kg, ml, piece
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.StockTransaction:
+    properties:
+      correlation_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      note:
+        type: string
+      order_id:
+        type: integer
+      quantity_change:
+        description: positive=restock, negative=deduction
+        type: number
+      raw_material_id:
+        type: integer
+      type:
+        type: string
+    type: object
+  service.DeductItem:
+    properties:
+      menu_item_id:
+        type: integer
+      portion_multiplier:
+        description: 1.0 = ธรรมดา, 1.5 = พิเศษ
+        type: number
+      quantity:
+        description: number of portions ordered
+        type: integer
+    type: object
+host: localhost:3004
+info:
+  contact: {}
+  description: This is the API server for an inventory service.
+  title: Inventory Service API
+  version: "1.0"
+paths:
+  /api/v1/inventory/materials:
+    get:
+      description: Get a list of all raw materials in inventory
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.RawMaterial'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all raw materials
+      tags:
+      - materials
+    post:
+      consumes:
+      - application/json
+      description: Add a new raw material to the inventory
+      parameters:
+      - description: Material Data
+        in: body
+        name: material
+        required: true
+        schema:
+          $ref: '#/definitions/model.RawMaterial'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.RawMaterial'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a raw material
+      tags:
+      - materials
+  /api/v1/inventory/materials/{id}:
+    get:
+      description: Get detailed information about a specific raw material
+      parameters:
+      - description: Material ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RawMaterial'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get material by ID
+      tags:
+      - materials
+    put:
+      consumes:
+      - application/json
+      description: Update an existing raw material by its ID
+      parameters:
+      - description: Material ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated Material Data
+        in: body
+        name: material
+        required: true
+        schema:
+          $ref: '#/definitions/model.RawMaterial'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RawMaterial'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a raw material
+      tags:
+      - materials
+  /api/v1/inventory/materials/low-stock:
+    get:
+      description: Get a list of raw materials that are below their reorder point
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.RawMaterial'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get low-stock materials
+      tags:
+      - materials
+  /api/v1/inventory/stock/adjust:
+    post:
+      consumes:
+      - application/json
+      description: Manually adjust the stock level of a raw material
+      parameters:
+      - description: Adjustment Request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.adjustRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Adjust stock
+      tags:
+      - stock
+  /api/v1/inventory/stock/deduct:
+    post:
+      consumes:
+      - application/json
+      description: Deduct stock for multiple menu items based on their BOM from Catalog
+      parameters:
+      - description: Deduction Request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.deductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Deduct stock via BOM
+      tags:
+      - stock
+  /api/v1/inventory/stock/restock:
+    post:
+      consumes:
+      - application/json
+      description: Add stock to a specific raw material
+      parameters:
+      - description: Restock Request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.restockRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Restock material
+      tags:
+      - stock
+  /api/v1/inventory/transactions:
+    get:
+      description: Get a list of all stock transactions (restock, deduction, adjustment)
+      parameters:
+      - description: Limit results (default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.StockTransaction'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all transactions
+      tags:
+      - transactions
+  /api/v1/inventory/transactions/{material_id}:
+    get:
+      description: Get all stock transactions for a specific raw material
+      parameters:
+      - description: Material ID
+        in: path
+        name: material_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.StockTransaction'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get transactions by Material ID
+      tags:
+      - transactions
+swagger: "2.0"

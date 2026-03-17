@@ -35,6 +35,16 @@ type deductRequest struct {
 }
 
 // POST /api/v1/inventory/stock/restock
+// Restock godoc
+// @Summary      Restock material
+// @Description  Add stock to a specific raw material
+// @Tags         stock
+// @Accept       json
+// @Produce      json
+// @Param        req  body      restockRequest true  "Restock Request"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Router       /api/v1/inventory/stock/restock [post]
 func (h *StockHandler) Restock(c *fiber.Ctx) error {
 	var req restockRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -54,6 +64,16 @@ func (h *StockHandler) Restock(c *fiber.Ctx) error {
 }
 
 // POST /api/v1/inventory/stock/adjust
+// Adjust godoc
+// @Summary      Adjust stock
+// @Description  Manually adjust the stock level of a raw material
+// @Tags         stock
+// @Accept       json
+// @Produce      json
+// @Param        req  body      adjustRequest true  "Adjustment Request"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Router       /api/v1/inventory/stock/adjust [post]
 func (h *StockHandler) Adjust(c *fiber.Ctx) error {
 	var req adjustRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -75,6 +95,17 @@ func (h *StockHandler) Adjust(c *fiber.Ctx) error {
 // POST /api/v1/inventory/stock/deduct
 // Manual deduction endpoint — caller provides menu_item_ids and quantities.
 // Inventory service fetches BOM from Catalog and deducts accordingly.
+// Deduct godoc
+// @Summary      Deduct stock via BOM
+// @Description  Deduct stock for multiple menu items based on their BOM from Catalog
+// @Tags         stock
+// @Accept       json
+// @Produce      json
+// @Param        req  body      deductRequest true  "Deduction Request"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /api/v1/inventory/stock/deduct [post]
 func (h *StockHandler) Deduct(c *fiber.Ctx) error {
 	var req deductRequest
 	if err := c.BodyParser(&req); err != nil {

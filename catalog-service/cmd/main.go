@@ -12,6 +12,8 @@ import (
 	"catalog-service/internal/model"
 	"catalog-service/internal/repository"
 	"catalog-service/internal/service"
+	_ "catalog-service/docs" // Swagger docs
+	swagger "github.com/gofiber/swagger"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -20,6 +22,12 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// @title Catalog Service API
+// @version 1.0
+// @description This is the API server for a catalog service.
+// @host localhost:3003
+// @BasePath /
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -105,6 +113,9 @@ func main() {
 	prome := fiberprometheus.NewWithDefaultRegistry("catalog-service")
 	app.Use(prome.Middleware)
 	prome.RegisterAt(app, "/metrics")
+
+	// Swagger route
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Routes
 	api := app.Group("/api/v1/catalog")

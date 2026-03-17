@@ -7,6 +7,8 @@ import (
     "kitchen-service/internal/repository"
     "kitchen-service/internal/service"
     "kitchen-service/internal/worker"
+    _ "kitchen-service/docs" // Swagger docs
+    swagger "github.com/gofiber/swagger"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -17,6 +19,12 @@ import (
 	"gorm.io/gorm"
 	"os"
 )
+
+// @title Kitchen Service API
+// @version 1.0
+// @description This is the API server for a kitchen service.
+// @host localhost:3005
+// @BasePath /
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -53,6 +61,9 @@ func main() {
     // 3.Newman Tip: แทนที่จะให้มันสร้าง Registry เอง
     // เราจะใช้ Default ของ Prometheus ที่รวม Go Metrics ไว้แล้ว
     prome.RegisterAt(app, "/metrics")
+
+    // Swagger route
+    app.Get("/swagger/*", swagger.HandlerDefault)
 
     // 3. Routes
     app.Get("/health", func(c *fiber.Ctx) error {

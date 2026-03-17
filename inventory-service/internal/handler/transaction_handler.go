@@ -18,6 +18,15 @@ func NewTransactionHandler(repo repository.TransactionRepository) *TransactionHa
 }
 
 // GET /api/v1/inventory/transactions?limit=50
+// GetAll godoc
+// @Summary      Get all transactions
+// @Description  Get a list of all stock transactions (restock, deduction, adjustment)
+// @Tags         transactions
+// @Produce      json
+// @Param        limit query     int  false  "Limit results (default 50)"
+// @Success      200   {object}  map[string][]model.StockTransaction
+// @Failure      500   {object}  map[string]interface{}
+// @Router       /api/v1/inventory/transactions [get]
 func (h *TransactionHandler) GetAll(c *fiber.Ctx) error {
 	limit := 50
 	if l := c.QueryInt("limit", 0); l > 0 {
@@ -33,6 +42,16 @@ func (h *TransactionHandler) GetAll(c *fiber.Ctx) error {
 }
 
 // GET /api/v1/inventory/transactions/:material_id
+// GetByMaterial godoc
+// @Summary      Get transactions by Material ID
+// @Description  Get all stock transactions for a specific raw material
+// @Tags         transactions
+// @Produce      json
+// @Param        material_id path      int  true  "Material ID"
+// @Success      200         {object}  map[string][]model.StockTransaction
+// @Failure      400         {object}  map[string]interface{}
+// @Failure      500         {object}  map[string]interface{}
+// @Router       /api/v1/inventory/transactions/{material_id} [get]
 func (h *TransactionHandler) GetByMaterial(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("material_id"))
 	if err != nil {

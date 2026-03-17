@@ -1,0 +1,946 @@
+basePath: /
+definitions:
+  handler.addBOMRequest:
+    properties:
+      ingredient_id:
+        type: integer
+      quantity:
+        type: number
+      sub_menu_item_id:
+        type: integer
+    type: object
+  handler.addChoiceOptionRequest:
+    properties:
+      extra_price:
+        type: number
+      ingredient_id:
+        type: integer
+      quantity:
+        type: number
+    type: object
+  handler.assignStationRequest:
+    properties:
+      kitchen_station_id:
+        type: integer
+    type: object
+  model.BOMChoiceGroup:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_required:
+        description: must pick one
+        type: boolean
+      max_choices:
+        type: integer
+      menu_item_id:
+        type: integer
+      min_choices:
+        type: integer
+      name:
+        description: e.g. "เลือกเส้น"
+        type: string
+      options:
+        items:
+          $ref: '#/definitions/model.BOMChoiceOption'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  model.BOMChoiceOption:
+    properties:
+      created_at:
+        type: string
+      extra_price:
+        type: number
+      group_id:
+        type: integer
+      id:
+        type: integer
+      ingredient:
+        $ref: '#/definitions/model.Ingredient'
+      ingredient_id:
+        type: integer
+      quantity:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  model.BOMItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      ingredient:
+        $ref: '#/definitions/model.Ingredient'
+      ingredient_id:
+        type: integer
+      menu_item_id:
+        type: integer
+      quantity:
+        type: number
+      sub_menu_item:
+        $ref: '#/definitions/model.MenuItem'
+      sub_menu_item_id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  model.Ingredient:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      unit:
+        description: e.g. "g", "ml", "piece"
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.KitchenStation:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.MenuAddOn:
+    properties:
+      created_at:
+        type: string
+      extra_price:
+        type: number
+      id:
+        type: integer
+      ingredient:
+        $ref: '#/definitions/model.Ingredient'
+      ingredient_id:
+        type: integer
+      is_available:
+        type: boolean
+      menu_item_id:
+        type: integer
+      quantity:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  model.MenuItem:
+    properties:
+      category:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      is_available:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  model.MenuPortionSize:
+    properties:
+      created_at:
+        type: string
+      extra_price:
+        type: number
+      id:
+        type: integer
+      is_default:
+        type: boolean
+      menu_item_id:
+        type: integer
+      name:
+        description: e.g. "ธรรมดา", "พิเศษ"
+        type: string
+      quantity_multiplier:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  service.FlatBOMItem:
+    properties:
+      ingredient_id:
+        type: integer
+      ingredient_name:
+        type: string
+      quantity:
+        type: number
+      unit:
+        type: string
+    type: object
+host: localhost:3003
+info:
+  contact: {}
+  description: This is the API server for a catalog service.
+  title: Catalog Service API
+  version: "1.0"
+paths:
+  /api/v1/catalog/addons/{addon_id}:
+    delete:
+      description: Delete an optional extra by its ID
+      parameters:
+      - description: Add-on ID
+        in: path
+        name: addon_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete an add-on
+      tags:
+      - addons
+  /api/v1/catalog/bom/{bom_id}:
+    delete:
+      description: Delete a BOM item by its ID
+      parameters:
+      - description: BOM Item ID
+        in: path
+        name: bom_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a BOM item
+      tags:
+      - bom
+  /api/v1/catalog/choices/{group_id}:
+    delete:
+      description: Delete a BOM choice group by its ID
+      parameters:
+      - description: Group ID
+        in: path
+        name: group_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a choice group
+      tags:
+      - choices
+  /api/v1/catalog/choices/{group_id}/options:
+    post:
+      consumes:
+      - application/json
+      description: Add an ingredient option to a BOM choice group
+      parameters:
+      - description: Group ID
+        in: path
+        name: group_id
+        required: true
+        type: integer
+      - description: Option Data
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.addChoiceOptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.BOMChoiceOption'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Add a choice option
+      tags:
+      - choices
+  /api/v1/catalog/ingredients:
+    get:
+      description: Get a list of all ingredients
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.Ingredient'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all ingredients
+      tags:
+      - ingredients
+    post:
+      consumes:
+      - application/json
+      description: Create a new ingredient with the provided data
+      parameters:
+      - description: Ingredient Data
+        in: body
+        name: ingredient
+        required: true
+        schema:
+          $ref: '#/definitions/model.Ingredient'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Ingredient'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new ingredient
+      tags:
+      - ingredients
+  /api/v1/catalog/menus:
+    get:
+      description: Get a list of all menu items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.MenuItem'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all menu items
+      tags:
+      - menus
+    post:
+      consumes:
+      - application/json
+      description: Create a new menu item with the provided data
+      parameters:
+      - description: Menu Item Data
+        in: body
+        name: menu
+        required: true
+        schema:
+          $ref: '#/definitions/model.MenuItem'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.MenuItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new menu item
+      tags:
+      - menus
+  /api/v1/catalog/menus/{id}:
+    delete:
+      description: Delete a menu item by its ID
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a menu item
+      tags:
+      - menus
+    get:
+      description: Get detailed information about a specific menu item by its ID
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a menu item by ID
+      tags:
+      - menus
+    put:
+      consumes:
+      - application/json
+      description: Update an existing menu item by its ID
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated Menu Item Data
+        in: body
+        name: menu
+        required: true
+        schema:
+          $ref: '#/definitions/model.MenuItem'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.MenuItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a menu item
+      tags:
+      - menus
+  /api/v1/catalog/menus/{id}/addons:
+    get:
+      description: Get the optional extras for a specific menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.MenuAddOn'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get add-ons by Menu Item ID
+      tags:
+      - addons
+    post:
+      consumes:
+      - application/json
+      description: Create a new optional extra for a menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Add-on Data
+        in: body
+        name: addon
+        required: true
+        schema:
+          $ref: '#/definitions/model.MenuAddOn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.MenuAddOn'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create an add-on
+      tags:
+      - addons
+  /api/v1/catalog/menus/{id}/bom:
+    get:
+      description: Get the Bill of Materials for a specific menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.BOMItem'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get BOM by Menu Item ID
+      tags:
+      - bom
+    post:
+      consumes:
+      - application/json
+      description: Add an ingredient or sub-menu item to a menu item's BOM
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: BOM Item Data
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.addBOMRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.BOMItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Add a BOM item
+      tags:
+      - bom
+  /api/v1/catalog/menus/{id}/bom/flat:
+    get:
+      description: Recursively expands all sub-recipes and returns a flat list of
+        raw ingredients
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/service.FlatBOMItem'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get Flat BOM by Menu Item ID
+      tags:
+      - bom
+  /api/v1/catalog/menus/{id}/choices:
+    get:
+      description: Get the Bill of Materials choice groups for a specific menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.BOMChoiceGroup'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get choices by Menu Item ID
+      tags:
+      - choices
+    post:
+      consumes:
+      - application/json
+      description: Create a new BOM choice group for a menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Choice Group Data
+        in: body
+        name: group
+        required: true
+        schema:
+          $ref: '#/definitions/model.BOMChoiceGroup'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.BOMChoiceGroup'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a choice group
+      tags:
+      - choices
+  /api/v1/catalog/menus/{id}/portions:
+    get:
+      description: Get size variants for a specific menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.MenuPortionSize'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get portions by Menu Item ID
+      tags:
+      - portions
+    post:
+      consumes:
+      - application/json
+      description: Create a new size variant for a menu item
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Portion Data
+        in: body
+        name: portion
+        required: true
+        schema:
+          $ref: '#/definitions/model.MenuPortionSize'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.MenuPortionSize'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a portion size
+      tags:
+      - portions
+  /api/v1/catalog/menus/{id}/station:
+    post:
+      consumes:
+      - application/json
+      description: Assign a menu item to be handled by a specific kitchen station
+      parameters:
+      - description: Menu Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Assignment Data
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/handler.assignStationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Assign menu to station
+      tags:
+      - stations
+  /api/v1/catalog/options/{option_id}:
+    delete:
+      description: Delete a choice option by its ID
+      parameters:
+      - description: Option ID
+        in: path
+        name: option_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a choice option
+      tags:
+      - choices
+  /api/v1/catalog/portions/{portion_id}:
+    delete:
+      description: Delete a size variant by its ID
+      parameters:
+      - description: Portion ID
+        in: path
+        name: portion_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a portion size
+      tags:
+      - portions
+  /api/v1/catalog/stations:
+    get:
+      description: Get a list of all defined kitchen stations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/model.KitchenStation'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get all kitchen stations
+      tags:
+      - stations
+    post:
+      consumes:
+      - application/json
+      description: Define a new kitchen station
+      parameters:
+      - description: Station Data
+        in: body
+        name: station
+        required: true
+        schema:
+          $ref: '#/definitions/model.KitchenStation'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.KitchenStation'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a kitchen station
+      tags:
+      - stations
+swagger: "2.0"
