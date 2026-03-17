@@ -1,0 +1,116 @@
+===============================
+  Running Food Delivery Tests  
+===============================
+
+▶ Testing Order Service...
+=== RUN   TestCreateOrder_Success
+{"level":"info","service":"order-service","order_id":"0","correlation_id":"","time":"2026-03-17T22:17:56+07:00","message":"Order created successfully"}
+--- PASS: TestCreateOrder_Success (0.00s)
+=== RUN   TestCreateOrder_InvalidJSON
+--- PASS: TestCreateOrder_InvalidJSON (0.00s)
+=== RUN   TestCreateOrder_ServiceError
+--- PASS: TestCreateOrder_ServiceError (0.00s)
+=== RUN   TestGetAllOrders_ReturnsOrders
+{"level":"info","service":"order-service","correlation_id":"","count":1,"time":"2026-03-17T22:17:56+07:00","message":"Fetched all orders"}
+--- PASS: TestGetAllOrders_ReturnsOrders (0.00s)
+=== RUN   TestGetOrderByID_Found
+{"level":"info","service":"order-service","correlation_id":"","order_id":1,"time":"2026-03-17T22:17:56+07:00","message":"Fetched order by ID"}
+--- PASS: TestGetOrderByID_Found (0.00s)
+=== RUN   TestGetOrderByID_NotFound
+{"level":"warn","error":"record not found","id":99,"time":"2026-03-17T22:17:56+07:00","message":"Order not found"}
+--- PASS: TestGetOrderByID_NotFound (0.00s)
+=== RUN   TestGetOrderByID_InvalidID
+{"level":"warn","error":"strconv.Atoi: parsing \"abc\": invalid syntax","id":"abc","time":"2026-03-17T22:17:56+07:00","message":"Invalid order ID format"}
+--- PASS: TestGetOrderByID_InvalidID (0.00s)
+PASS
+ok  	order-service/internal/handler	0.689s
+?   	order-service/internal/middleware	[no test files]
+?   	order-service/internal/model	[no test files]
+?   	order-service/internal/repository	[no test files]
+=== RUN   TestTC_ORDER_001_CreateOrderSuccess
+{"level":"info","service":"order-service","order_id":0,"correlation_id":"test-correlation-id","time":"2026-03-17T22:17:56+07:00","message":"Publishing event for order"}
+--- PASS: TestTC_ORDER_001_CreateOrderSuccess (0.10s)
+=== RUN   TestTC_ORDER_002_OrderAddressSnapshot
+--- PASS: TestTC_ORDER_002_OrderAddressSnapshot (0.00s)
+=== RUN   TestTC_ORDER_003_CreateOrderWithInvalidMenuItem
+    order_service_test.go:90: Menu item validation not yet implemented in service layer
+--- SKIP: TestTC_ORDER_003_CreateOrderWithInvalidMenuItem (0.00s)
+=== RUN   TestTC_ORDER_004_CreateOrderZeroQuantity
+    order_service_test.go:95: Quantity validation not yet implemented in service layer
+--- SKIP: TestTC_ORDER_004_CreateOrderZeroQuantity (0.00s)
+PASS
+ok  	order-service/internal/service	0.687s
+✅ Order Service — All tests passed!
+
+▶ Testing Kitchen Service...
+=== RUN   TestCreateTicket_Success
+{"level":"info","service":"kitchen-service","order_id":"1","correlation_id":"unknown","time":"2026-03-17T22:17:58+07:00","message":"Ticket created successfully"}
+--- PASS: TestCreateTicket_Success (0.00s)
+=== RUN   TestCreateTicket_InvalidJSON
+--- PASS: TestCreateTicket_InvalidJSON (0.00s)
+=== RUN   TestCreateTicket_ServiceError
+--- PASS: TestCreateTicket_ServiceError (0.00s)
+=== RUN   TestUpdateStatus_Success
+{"level":"info","service":"kitchen-service","correlation_id":"unknown","order_id":1,"status":"Cooking","time":"2026-03-17T22:17:58+07:00","message":"Ticket status updated"}
+--- PASS: TestUpdateStatus_Success (0.00s)
+=== RUN   TestUpdateStatus_InvalidOrderID
+--- PASS: TestUpdateStatus_InvalidOrderID (0.00s)
+=== RUN   TestUpdateStatus_ServiceError
+{"level":"error","error":"not found","order_id":99,"status":"Ready","time":"2026-03-17T22:17:58+07:00","message":"Failed to update ticket status"}
+--- PASS: TestUpdateStatus_ServiceError (0.00s)
+PASS
+ok  	kitchen-service/internal/handler	0.685s
+?   	kitchen-service/internal/middleware	[no test files]
+?   	kitchen-service/internal/model	[no test files]
+?   	kitchen-service/internal/repository	[no test files]
+=== RUN   TestTC_KITCHEN_001_KitchenStatusWorkflow
+=== RUN   TestTC_KITCHEN_001_KitchenStatusWorkflow/Pending_to_Accepted
+=== RUN   TestTC_KITCHEN_001_KitchenStatusWorkflow/Accepted_to_Ready
+--- PASS: TestTC_KITCHEN_001_KitchenStatusWorkflow (0.00s)
+    --- PASS: TestTC_KITCHEN_001_KitchenStatusWorkflow/Pending_to_Accepted (0.00s)
+    --- PASS: TestTC_KITCHEN_001_KitchenStatusWorkflow/Accepted_to_Ready (0.00s)
+=== RUN   TestTC_KITCHEN_002_KDSWebSocketNotification
+    kitchen_service_test.go:77: WebSocket notification logic not yet implemented in service layer
+--- SKIP: TestTC_KITCHEN_002_KDSWebSocketNotification (0.00s)
+PASS
+ok  	kitchen-service/internal/service	0.466s
+?   	kitchen-service/internal/worker	[no test files]
+✅ Kitchen Service — All tests passed!
+
+▶ Testing Integration Tests...
+=== RUN   TestTC_DB_001_OrderPersistence
+    db_integration_test.go:58: --- Fetched Data from DB ---
+    db_integration_test.go:59: Order ID: 2
+    db_integration_test.go:60: Customer: TEST_PERSIST_001
+    db_integration_test.go:61: Amount:   250.75
+    db_integration_test.go:62: Status:   Pending
+    db_integration_test.go:63: Address:  123 Test Street, Integration City
+    db_integration_test.go:64: Created:  2026-03-17T22:17:59+07:00
+    db_integration_test.go:65: ----------------------------
+    db_integration_test.go:67: Successfully inserted and verified order ID: 2 in order_db
+--- PASS: TestTC_DB_001_OrderPersistence (0.06s)
+=== RUN   TestTC_GW_001_Routing
+=== RUN   TestTC_GW_001_Routing/Auth_Health
+=== RUN   TestTC_GW_001_Routing/Order_Route
+=== RUN   TestTC_GW_001_Routing/Menu_Route
+--- PASS: TestTC_GW_001_Routing (0.01s)
+    --- PASS: TestTC_GW_001_Routing/Auth_Health (0.00s)
+    --- PASS: TestTC_GW_001_Routing/Order_Route (0.00s)
+    --- PASS: TestTC_GW_001_Routing/Menu_Route (0.00s)
+=== RUN   TestTC_GW_002_RateLimiting
+    gateway_test.go:43: TC-GW-002: Rate Limiting verification usually requires high-volume bombardment
+--- PASS: TestTC_GW_002_RateLimiting (0.00s)
+=== RUN   TestTC_SEC_001_SQLInjection
+--- PASS: TestTC_SEC_001_SQLInjection (0.00s)
+=== RUN   TestTC_PERF_001_Throughput
+    non_functional_test.go:36: Completed 0 requests in 72.525ms (0.00 RPS)
+--- PASS: TestTC_PERF_001_Throughput (0.07s)
+=== RUN   TestTC_RABBIT_001_PublishOrderPlaced
+--- PASS: TestTC_RABBIT_001_PublishOrderPlaced (0.06s)
+PASS
+ok  	project-tests	0.293s
+✅ Integration Tests — All tests passed!
+
+===============================
+  Results: ✅ 3 passed  ❌ 0 failed
+===============================

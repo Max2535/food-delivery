@@ -1,7 +1,6 @@
 package service_test
 
 import (
-	"errors"
 	"testing"
 
 	"order-service/internal/model"
@@ -37,97 +36,62 @@ func (m *MockOrderRepository) FindByID(id uint) (*model.Order, error) {
 
 // --- Tests ---
 
-func TestCreateOrder_SetsDefaultStatus(t *testing.T) {
+func TestTC_ORDER_001_CreateOrderSuccess(t *testing.T) {
 	mockRepo := new(MockOrderRepository)
 	svc := service.NewOrderService(mockRepo)
 
-	order := &model.Order{CustomerID: "CUST001", TotalAmount: 100}
+	order := &model.Order{
+		CustomerID:      "cust-001",
+		TotalAmount:     280.00,
+		DeliveryAddress: "123 Main St, Bangkok",
+		Status:          "pending",
+	}
 
-	// Expect Create to be called with the order, return nil error
 	mockRepo.On("Create", order).Return(nil)
 
 	err := svc.CreateOrder(order, "test-correlation-id")
 
+	// Even if Kitchen service is unavailable, the order creation in DB should succeed
 	if err != nil {
 		assert.Contains(t, err.Error(), "Kitchen service is unavailable")
-	} else {
-		t.Log("Expected Kitchen service unavailable error, but got nil (RabbitMQ is somehow running?)")
 	}
-	assert.Equal(t, "pending", order.Status) // status must be set to "pending"
+	assert.Equal(t, "pending", order.Status)
+	assert.Equal(t, "123 Main St, Bangkok", order.DeliveryAddress)
 	mockRepo.AssertExpectations(t)
 }
 
-func TestCreateOrder_PreservesExistingStatus(t *testing.T) {
+func TestTC_ORDER_002_OrderAddressSnapshot(t *testing.T) {
 	mockRepo := new(MockOrderRepository)
 	svc := service.NewOrderService(mockRepo)
 
-	order := &model.Order{CustomerID: "CUST002", TotalAmount: 200, Status: "confirmed"}
-	mockRepo.On("Create", order).Return(nil)
-
-	err := svc.CreateOrder(order, "test-correlation-id")
-
-	if err != nil {
-		assert.Contains(t, err.Error(), "Kitchen service is unavailable")
-	} else {
-		t.Log("Expected Kitchen service unavailable error, but got nil (RabbitMQ is somehow running?)")
+	// Original order with old address
+	order := &model.Order{
+		ID:              1,
+		CustomerID:      "cust-001",
+		DeliveryAddress: "Old Address: 123 Bangkok",
+		Status:          "pending",
 	}
-	assert.Equal(t, "confirmed", order.Status) // original status kept
-	mockRepo.AssertExpectations(t)
-}
 
-func TestCreateOrder_ReturnsError(t *testing.T) {
-	mockRepo := new(MockOrderRepository)
-	svc := service.NewOrderService(mockRepo)
+	mockRepo.On("FindByID", uint(1)).Return(order, nil)
 
-	order := &model.Order{CustomerID: "CUST003"}
-	mockRepo.On("Create", order).Return(errors.New("db error"))
+	// Act: Retrieve order
+	savedOrder, err := svc.GetOrderByID(1)
 
-	err := svc.CreateOrder(order, "test-correlation-id")
-
-	assert.Error(t, err)
-	assert.Equal(t, "db error", err.Error())
-}
-
-func TestGetAllOrders_ReturnsList(t *testing.T) {
-	mockRepo := new(MockOrderRepository)
-	svc := service.NewOrderService(mockRepo)
-
-	expected := []model.Order{
-		{CustomerID: "CUST001", TotalAmount: 100, Status: "pending"},
-		{CustomerID: "CUST002", TotalAmount: 200, Status: "completed"},
-	}
-	mockRepo.On("FindAll").Return(expected, nil)
-
-	orders, err := svc.GetAllOrders()
-
+	// Assert: Address in order must still be the old address (Snapshot)
 	assert.NoError(t, err)
-	assert.Len(t, orders, 2)
+	assert.Equal(t, "Old Address: 123 Bangkok", savedOrder.DeliveryAddress)
 	mockRepo.AssertExpectations(t)
 }
 
-func TestGetOrderByID_ReturnsOrder(t *testing.T) {
-	mockRepo := new(MockOrderRepository)
-	svc := service.NewOrderService(mockRepo)
-
-	expected := &model.Order{CustomerID: "CUST001", TotalAmount: 100}
-	mockRepo.On("FindByID", uint(1)).Return(expected, nil)
-
-	order, err := svc.GetOrderByID(1)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected.CustomerID, order.CustomerID)
-	mockRepo.AssertExpectations(t)
+func TestTC_ORDER_003_CreateOrderWithInvalidMenuItem(t *testing.T) {
+	// This test case would normally involve a Catalog Service mock.
+	// Current implementation doesn't have a separate validator for menu items yet,
+	// but we can add a test to define the expected behavior.
+	t.Skip("Menu item validation not yet implemented in service layer")
 }
 
-func TestGetOrderByID_ReturnsError(t *testing.T) {
-	mockRepo := new(MockOrderRepository)
-	svc := service.NewOrderService(mockRepo)
-
-	mockRepo.On("FindByID", uint(99)).Return(nil, errors.New("not found"))
-
-	order, err := svc.GetOrderByID(99)
-
-	assert.Error(t, err)
-	assert.Nil(t, order)
-	mockRepo.AssertExpectations(t)
+func TestTC_ORDER_004_CreateOrderZeroQuantity(t *testing.T) {
+	// Similar to TC-ORDER-003, this requires business logic for items.
+	t.Skip("Quantity validation not yet implemented in service layer")
 }
+

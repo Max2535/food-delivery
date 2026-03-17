@@ -73,7 +73,7 @@ func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 		Int("count", len(orders)).
 		Msg("Fetched all orders")
 
-	return c.JSON(fiber.Map{"orders": orders})
+	return c.JSON(orders)
 }
 
 // GetOrderByID godoc

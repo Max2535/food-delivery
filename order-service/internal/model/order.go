@@ -16,6 +16,9 @@ type Order struct {
 	// Status สำหรับทำ State Machine เช่น Pending, Confirmed, Shipped
 	Status string `gorm:"type:varchar(20);default:'Pending'" json:"status"`
 
+	// DeliveryAddress stores the snapshot of the customer address at the time of ordering
+	DeliveryAddress string `gorm:"type:text" json:"delivery_address"`
+
 	// GORM จะจัดการค่า CreatedAt และ UpdatedAt ให้โดยอัตโนมัติ
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
