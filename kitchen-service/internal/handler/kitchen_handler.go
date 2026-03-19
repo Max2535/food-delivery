@@ -119,7 +119,7 @@ func (h *KitchenHandler) GetStatus(c *fiber.Ctx) error {
 	orderIDStr := c.Params("orderId")
 	orderID, err := strconv.ParseUint(orderIDStr, 10, 32)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "OrderID ไม่ถูกต้อง",
 		})
 	}

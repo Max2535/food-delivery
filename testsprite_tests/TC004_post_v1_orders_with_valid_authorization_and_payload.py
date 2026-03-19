@@ -4,52 +4,46 @@ BASE_URL = "http://localhost:8080"
 TIMEOUT = 30
 
 def test_post_v1_orders_with_valid_authorization_and_payload():
+    # First, login to get a valid JWT token
     login_url = f"{BASE_URL}/v1/auth/login"
-    orders_url = f"{BASE_URL}/v1/orders"
-    # Valid login credentials (assuming test user exists)
     login_payload = {
         "username": "testuser",
-        "password": "TestPass123!"
+        "password": "testpassword"
     }
+    login_headers = {"Content-Type": "application/json"}
     try:
-        # Step 1: Obtain JWT token via login
-        login_response = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
-        assert login_response.status_code == 200, f"Expected 200 OK on login, got {login_response.status_code}"
-        login_json = login_response.json()
-        token = login_json.get("token")
-        assert token and isinstance(token, str), "JWT token missing or invalid in login response"
+        resp_login = requests.post(login_url, json=login_payload, headers=login_headers, timeout=TIMEOUT)
+        assert resp_login.status_code == 200, f"Login failed with status {resp_login.status_code}"
+        json_login = resp_login.json()
+        assert "token" in json_login or "access_token" in json_login, "JWT token not found in login response"
+        token = json_login.get("token") or json_login.get("access_token")
+    except (requests.RequestException, AssertionError) as e:
+        raise AssertionError(f"Login request or validation failed: {e}")
 
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+    headers_order = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
 
-        # Step 2: Prepare valid order payload
-        order_payload = {
-            "customer_id": "customer-123",
-            "items": [
-                {
-                    "menu_item_id": "menuitem-abc",
-                    "quantity": 2
-                },
-                {
-                    "menu_item_id": "menuitem-def",
-                    "quantity": 1
-                }
-            ],
-            "total_amount": 29.99
-        }
+    # Prepare a valid order payload with dummy data
+    # Since PRD does not specify exact fields for items, assume items as list of dict with menu_item_id and quantity
+    order_payload = {
+        "customer_id": "cust_12345",
+        "items": [
+            {"menu_item_id": "menu_001", "quantity": 2},
+            {"menu_item_id": "menu_002", "quantity": 1}
+        ],
+        "total_amount": 29.99
+    }
 
-        # Step 3: Create order
-        order_response = requests.post(orders_url, headers=headers, json=order_payload, timeout=TIMEOUT)
-        assert order_response.status_code == 201, f"Expected 201 Created for order creation, got {order_response.status_code}"
-        order_json = order_response.json()
-        order_id = order_json.get("order_id")
-        assert order_id and isinstance(order_id, str), "order_id missing or invalid in order creation response"
+    order_url = f"{BASE_URL}/v1/orders"
 
-    finally:
-        # Clean up: attempt to delete order if order_id was created
-        # Since deletion endpoint is not provided, skipping deletion step
-        pass
+    try:
+        response = requests.post(order_url, json=order_payload, headers=headers_order, timeout=TIMEOUT)
+        assert response.status_code == 201, f"Expected 201 Created, got {response.status_code}"
+        json_resp = response.json()
+        assert "order_id" in json_resp, "order_id missing in response"
+    except (requests.RequestException, AssertionError) as e:
+        raise AssertionError(f"Order creation request or validation failed: {e}")
 
 test_post_v1_orders_with_valid_authorization_and_payload()

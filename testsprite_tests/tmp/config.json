@@ -8,12 +8,12 @@
     "projectName": "food-delivery",
     "projectPath": "d:\\go-lang\\food-delivery",
     "testIds": [],
-    "additionalInstruction": "Re-run all tests. Please ensure the execution handles Windows paths correctly.",
-    "serverMode": "development",
+    "additionalInstruction": "Re-run verification for all cases. Note that the user did a 'down -v' but may have missed '--build'. Check if 401 persists.",
+    "serverMode": "production",
     "envs": {
       "API_KEY": "sk-user-dXz1uKT7z7K5rcPgYpnInJNctxH9RWPulXyP8GzI8XSeK0mAW4zrdqMx_79vg9Q1W-Rmb3RNjrqs_HCEjFeh_LkF6gMVUJyLZ4_WrxmVeD1BY7Q5sf5qxbIynauy4Z_RhjM"
     }
   },
-  "serverPort": 54406,
-  "proxy": "http://1f6935c9-6250-4fee-a5a5-4eb152d348fc:vRKCNUGNhCUX3JjV4FynqDryD4WDZiRZ@tun.testsprite.com:8080"
+  "serverPort": 52958,
+  "proxy": "http://a0a3a1cc-81d4-4b27-a263-da829cf6331f:s4J6OBqi0Ibsv0usmkDIrbutLXEwc1m7@tun.testsprite.com:8080"
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"auth-service/internal/model"
 	"auth-service/internal/service"
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -65,5 +66,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "User registered successfully"})
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "User registered successfully",
+		"user_id": fmt.Sprint(user.ID),
+	})
 }

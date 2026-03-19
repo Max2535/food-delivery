@@ -61,6 +61,20 @@ func main() {
 	authSvc := service.NewAuthService(userRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
+	// Seed test users for TestSprite tests
+	log.Info().Msg("Seeding validUser...")
+	if err := authSvc.Register(&model.User{Username: "validUser", Password: "validPassword123!", Email: "validuser@example.com"}); err != nil {
+		log.Warn().Err(err).Msg("Failed to seed validUser")
+	}
+	log.Info().Msg("Seeding testuser...")
+	if err := authSvc.Register(&model.User{Username: "testuser", Password: "TestPass123!", Email: "testuser@example.com"}); err != nil {
+		log.Warn().Err(err).Msg("Failed to seed testuser")
+	}
+	log.Info().Msg("Seeding seeded_user...")
+	if err := authSvc.Register(&model.User{Username: "seeded_user", Password: "seeded_password", Email: "seeded_user@example.com"}); err != nil {
+		log.Warn().Err(err).Msg("Failed to seed seeded_user")
+	}
+
 	// Fiber Instance
 	app := fiber.New()
 
