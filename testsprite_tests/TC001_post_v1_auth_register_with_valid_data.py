@@ -7,8 +7,8 @@ TIMEOUT = 30
 
 def test_post_v1_auth_register_with_valid_data():
     url = BASE_URL + REGISTER_ENDPOINT
-    # Generate unique username and email using uuid to avoid conflict
-    unique_suffix = uuid.uuid4().hex[:8]
+    # Generate unique username and email for test isolation
+    unique_suffix = str(uuid.uuid4()).split('-')[0]
     payload = {
         "username": f"testuser_{unique_suffix}",
         "password": "ValidPass123!",
@@ -17,13 +17,14 @@ def test_post_v1_auth_register_with_valid_data():
     headers = {
         "Content-Type": "application/json"
     }
+
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=TIMEOUT)
-        assert response.status_code == 201, f"Expected status code 201, got {response.status_code}"
-        response_json = response.json()
-        assert "user_id" in response_json, "Response JSON does not contain user_id"
-        assert isinstance(response_json["user_id"], (str, int)), "user_id should be string or integer"
+        assert response.status_code == 201, f"Expected 201 Created, got {response.status_code}, response: {response.text}"
+        json_response = response.json()
+        assert "user_id" in json_response, f"'user_id' not found in response body: {json_response}"
+        assert isinstance(json_response["user_id"], (str, int)), f"user_id type is not str or int: {type(json_response['user_id'])}"
     except requests.RequestException as e:
-        raise AssertionError(f"Request failed: {e}")
+        assert False, f"HTTP Request failed: {e}"
 
 test_post_v1_auth_register_with_valid_data()

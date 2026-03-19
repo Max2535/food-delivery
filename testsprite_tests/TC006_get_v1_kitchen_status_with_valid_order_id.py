@@ -3,74 +3,72 @@ import uuid
 
 BASE_URL = "http://localhost:8080"
 TIMEOUT = 30
+LOGIN_ENDPOINT = f"{BASE_URL}/v1/auth/login"
+ORDER_ENDPOINT = f"{BASE_URL}/v1/orders"
+KITCHEN_STATUS_ENDPOINT = f"{BASE_URL}/v1/kitchen/status"
+
+VALID_LOGIN_PAYLOAD = {
+    "username": "testuser",
+    "password": "TestPass123!"
+}
 
 def test_get_v1_kitchen_status_with_valid_order_id():
-    # First, register a new user to ensure the user exists
-    register_payload = {
-        "username": "testuser",
-        "password": "testpassword",
-        "email": "testuser@example.com"
-    }
+    # Step 1: Login to get JWT token
     try:
-        register_resp = requests.post(f"{BASE_URL}/v1/auth/register", json=register_payload, timeout=TIMEOUT)
-        # 201 Created expected or 400/409 if user already exists
-        assert register_resp.status_code in {201, 400, 409}, f"Registration failed with status {register_resp.status_code}"
-
-        login_payload = {
-            "username": "testuser",
-            "password": "testpassword"
-        }
-        login_resp = requests.post(f"{BASE_URL}/v1/auth/login", json=login_payload, timeout=TIMEOUT)
-        assert login_resp.status_code == 200, f"Login failed with status {login_resp.status_code}"
+        login_resp = requests.post(
+            LOGIN_ENDPOINT,
+            json=VALID_LOGIN_PAYLOAD,
+            timeout=TIMEOUT
+        )
+        assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
         token = login_resp.json().get("token")
-        assert token, "JWT token missing in login response"
+        assert token, "JWT token not found in login response"
+        headers_auth = {"Authorization": f"Bearer {token}"}
+    except Exception as e:
+        raise AssertionError(f"Authentication step failed: {e}")
 
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
+    # Step 2: Create order to get valid order_id
+    order_payload = {
+        "customer_id": str(uuid.uuid4()),
+        "items": [
+            {
+                "menu_item_id": "item1",
+                "quantity": 1,
+                "portion_multiplier": 1.0
+            }
+        ],
+        "total_amount": 19.99
+    }
 
-        # Create a new order to obtain a valid order_id
-        order_payload = {
-            "customer_id": str(uuid.uuid4()),
-            "items": [
-                {
-                    "menu_item_id": "item123",
-                    "quantity": 1,
-                    "portion_multiplier": 1.0
-                }
-            ],
-            "total_amount": 9.99
-        }
-        order_resp = requests.post(f"{BASE_URL}/v1/orders", json=order_payload, headers=headers, timeout=TIMEOUT)
-        assert order_resp.status_code == 201, f"Order creation failed with status {order_resp.status_code}"
-        order_id = order_resp.json().get("order_id")
-        assert order_id, "order_id missing in order creation response"
-        
-        try:
-            # GET kitchen status for the created order
-            kitchen_resp = requests.get(f"{BASE_URL}/v1/kitchen/status/{order_id}", timeout=TIMEOUT)
-            assert kitchen_resp.status_code == 200, f"Expected status 200 but got {kitchen_resp.status_code}"
-            resp_json = kitchen_resp.json()
-            # Validate required fields in response
-            assert "status" in resp_json, "'status' field missing in kitchen status response"
-            assert resp_json["status"] in {"Received", "Cooking", "Ready"}, "Invalid kitchen ticket status value"
-            assert "ticket" in resp_json, "'ticket' field missing in kitchen status response"
-            ticket = resp_json["ticket"]
+    order_id = None
+    try:
+        create_order_resp = requests.post(
+            ORDER_ENDPOINT,
+            headers=headers_auth,
+            json=order_payload,
+            timeout=TIMEOUT
+        )
+        assert create_order_resp.status_code == 201, f"Order creation failed: {create_order_resp.text}"
+        order_id = create_order_resp.json().get("id")
+        assert order_id, "order_id not found in order creation response"
 
-            # ticket details should have items array (if exists)
-            assert isinstance(ticket, dict), "'ticket' should be a dictionary"
-            # items key can be optional if no items; if exists, should be a list
-            if "items" in ticket:
-                assert isinstance(ticket["items"], list), "'items' in ticket should be a list"
-        finally:
-            # Cleanup: delete the created order - assuming DELETE endpoint exists
-            # If endpoint does not exist, ignore cleanup or log
-            try:
-                requests.delete(f"{BASE_URL}/v1/orders/{order_id}", headers=headers, timeout=TIMEOUT)
-            except Exception:
-                pass
+        # Step 3: Get kitchen status with the valid order_id
+        kitchen_status_url = f"{KITCHEN_STATUS_ENDPOINT}/{str(order_id)}"
+        kitchen_resp = requests.get(kitchen_status_url, timeout=TIMEOUT)
 
-    except requests.RequestException as e:
-        assert False, f"Request failed: {str(e)}"
+        assert kitchen_resp.status_code == 200, f"Expected 200 OK, got {kitchen_resp.status_code}"
+
+        kitchen_data = kitchen_resp.json()
+        # Validate presence of kitchen ticket status and ticket details
+        assert "status" in kitchen_data, "Kitchen status missing in response"
+        assert kitchen_data["status"] in ["Received", "Cooking", "Ready"], "Invalid kitchen status value"
+        assert "ticket" in kitchen_data, "Kitchen ticket details missing in response"
+        ticket = kitchen_data["ticket"]
+        assert isinstance(ticket, dict), "Ticket details should be a dictionary"
+        assert "items" in ticket and isinstance(ticket["items"], list), "Ticket items missing or invalid type"
+
+    finally:
+        # Clean up: delete the order if deletion endpoint exists (Not specified in PRD)
+        pass
 
 test_get_v1_kitchen_status_with_valid_order_id()
