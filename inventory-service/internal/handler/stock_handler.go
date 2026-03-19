@@ -54,13 +54,17 @@ func (h *StockHandler) Restock(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "material_id and positive quantity are required"})
 	}
 	correlationID, _ := c.Locals("correlationID").(string)
-	material, err := h.service.Restock(req.MaterialID, req.Quantity, req.Note, correlationID)
+	material, tx, err := h.service.Restock(req.MaterialID, req.Quantity, req.Note, correlationID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	log.Info().Str("correlation_id", correlationID).Str("service", "inventory-service").
 		Uint("material_id", req.MaterialID).Float64("qty", req.Quantity).Msg("Stock restocked")
-	return c.JSON(fiber.Map{"message": "restocked", "raw_material": material})
+	return c.JSON(fiber.Map{
+		"message":        "restocked",
+		"raw_material":  material,
+		"transaction_id": tx.ID,
+	})
 }
 
 // POST /api/v1/inventory/stock/adjust
@@ -83,13 +87,17 @@ func (h *StockHandler) Adjust(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "material_id is required"})
 	}
 	correlationID, _ := c.Locals("correlationID").(string)
-	material, err := h.service.Adjust(req.MaterialID, req.Quantity, req.Note, correlationID)
+	material, tx, err := h.service.Adjust(req.MaterialID, req.Quantity, req.Note, correlationID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	log.Info().Str("correlation_id", correlationID).Str("service", "inventory-service").
 		Uint("material_id", req.MaterialID).Float64("delta", req.Quantity).Msg("Stock adjusted")
-	return c.JSON(fiber.Map{"message": "adjusted", "raw_material": material})
+	return c.JSON(fiber.Map{
+		"message":        "adjusted",
+		"raw_material":  material,
+		"transaction_id": tx.ID,
+	})
 }
 
 // POST /api/v1/inventory/stock/deduct

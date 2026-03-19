@@ -1,13 +1,30 @@
 import requests
 
 BASE_URL = "http://localhost:8080"
-# Please replace the token below with a valid JWT token for authentication
-AUTH_TOKEN = "Bearer REPLACE_WITH_VALID_JWT_TOKEN"
+TIMEOUT = 30
+
+def get_jwt_token():
+    # For this test, we assume we have valid credentials for an existing user.
+    login_url = f"{BASE_URL}/v1/auth/login"
+    login_payload = {
+        "username": "testuser",
+        "password": "TestPass123!"
+    }
+    try:
+        resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
+        assert resp.status_code == 200, f"Login failed with status {resp.status_code}"
+        data = resp.json()
+        token = data.get("token") or data.get("jwt") or data.get("access_token")
+        assert token, "JWT token not found in login response"
+        return token
+    except Exception as e:
+        raise RuntimeError(f"Could not obtain JWT token: {e}")
 
 def test_post_v1_catalog_menus_with_invalid_bom_entry():
+    token = get_jwt_token()
     url = f"{BASE_URL}/v1/catalog/menus"
     headers = {
-        "Authorization": AUTH_TOKEN,
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
     

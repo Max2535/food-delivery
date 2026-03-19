@@ -11,7 +11,7 @@ def test_post_v1_inventory_stock_restock_with_valid_authorization_and_payload():
     # Credentials for login - adjust if needed
     login_payload = {
         "username": "testuser",
-        "password": "testpassword"
+        "password": "TestPass123!"
     }
 
     # Authenticate and get JWT token
@@ -32,7 +32,8 @@ def test_post_v1_inventory_stock_restock_with_valid_authorization_and_payload():
     try:
         materials_response = requests.get(materials_url, timeout=TIMEOUT)
         assert materials_response.status_code == 200, f"Failed to get materials: {materials_response.status_code}"
-        materials = materials_response.json()
+        resp_json = materials_response.json()
+        materials = resp_json.get("raw_materials", [])
         assert isinstance(materials, list) and len(materials) > 0, "No materials found for restock"
         # Pick the first material with non-null id
         material_id = None

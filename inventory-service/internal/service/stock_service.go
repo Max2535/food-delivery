@@ -21,8 +21,8 @@ type DeductItem struct {
 }
 
 type StockService interface {
-	Restock(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, error)
-	Adjust(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, error)
+	Restock(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, *model.StockTransaction, error)
+	Adjust(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, *model.StockTransaction, error)
 	DeductByBOM(orderID *uint, items []DeductItem, correlationID string) error
 }
 
@@ -44,11 +44,11 @@ func NewStockService(
 	}
 }
 
-func (s *stockService) Restock(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, error) {
+func (s *stockService) Restock(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, *model.StockTransaction, error) {
 	return s.applyStockChange(materialID, qty, model.TransactionRestock, nil, note, correlationID)
 }
 
-func (s *stockService) Adjust(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, error) {
+func (s *stockService) Adjust(materialID uint, qty float64, note string, correlationID string) (*model.RawMaterial, *model.StockTransaction, error) {
 	return s.applyStockChange(materialID, qty, model.TransactionAdjustment, nil, note, correlationID)
 }
 
@@ -82,7 +82,7 @@ func (s *stockService) DeductByBOM(orderID *uint, items []DeductItem, correlatio
 			deductQty := bom.Quantity * float64(item.Quantity) * item.PortionMultiplier
 			note := fmt.Sprintf("auto-deduct: menu_item_id=%d qty=%d portion=%.2f", item.MenuItemID, item.Quantity, item.PortionMultiplier)
 
-			if _, err := s.applyStockChange(material.ID, -deductQty, model.TransactionDeduction, orderID, note, correlationID); err != nil {
+			if _, _, err := s.applyStockChange(material.ID, -deductQty, model.TransactionDeduction, orderID, note, correlationID); err != nil {
 				log.Error().Err(err).
 					Str("correlation_id", correlationID).
 					Uint("material_id", material.ID).
@@ -94,16 +94,16 @@ func (s *stockService) DeductByBOM(orderID *uint, items []DeductItem, correlatio
 }
 
 // applyStockChange updates CurrentStock and records a StockTransaction atomically.
-func (s *stockService) applyStockChange(materialID uint, delta float64, txType string, orderID *uint, note string, correlationID string) (*model.RawMaterial, error) {
+func (s *stockService) applyStockChange(materialID uint, delta float64, txType string, orderID *uint, note string, correlationID string) (*model.RawMaterial, *model.StockTransaction, error) {
 	material, err := s.materialRepo.FindByID(materialID)
 	if err != nil {
-		return nil, ErrMaterialNotFound
+		return nil, nil, ErrMaterialNotFound
 	}
 
 	material.CurrentStock += delta
 
 	if err := s.materialRepo.Update(material); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tx := &model.StockTransaction{
@@ -130,5 +130,5 @@ func (s *stockService) applyStockChange(materialID uint, delta float64, txType s
 			Msg("Stock below reorder point")
 	}
 
-	return material, nil
+	return material, tx, nil
 }
