@@ -60,14 +60,14 @@ func StartOrderConsumer(kitchenSvc service.KitchenService) {
 			}
 
 			// 4. นำข้อมูลไปสร้าง Ticket ใน DB ของ Kitchen
-			orderIDFloat, ok := data["order_id"].(float64)
-			if !ok {
-				log.Error().Interface("data", data).Msg("Invalid order_id missing or not float64")
+			var msgData struct {
+				OrderID uint            `json:"order_id"`
+				Items   json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(d.Body, &msgData); err != nil {
+				log.Error().Err(err).Msg("Error unmarshaling message body")
 				continue
 			}
-			orderID := uint(orderIDFloat)
-
-			itemsStr, _ := data["items"].(string)
 
 			correlationID := d.CorrelationId
 			if correlationID == "" {
@@ -77,18 +77,18 @@ func StartOrderConsumer(kitchenSvc service.KitchenService) {
 			log.Info().
 				Str("service", "kitchen-service").
 				Str("correlation_id", correlationID).
-				Uint("order_id", orderID).
+				Uint("order_id", msgData.OrderID).
 				Msg("Kitchen received new order")
 
 			ticket := &model.KitchenTicket{
-				OrderID: orderID,
-				Items:   itemsStr,
+				OrderID: msgData.OrderID,
+				Items:   string(msgData.Items),
 			}
 
 			if err := kitchenSvc.CreateTicket(ticket); err != nil {
-				log.Error().Err(err).Uint("order_id", orderID).Str("correlation_id", correlationID).Msg("Failed to create ticket for order")
+				log.Error().Err(err).Uint("order_id", msgData.OrderID).Str("correlation_id", correlationID).Msg("Failed to create ticket for order")
 			} else {
-				log.Info().Uint("order_id", orderID).Str("correlation_id", correlationID).Msg("Ticket successfully created for order")
+				log.Info().Uint("order_id", msgData.OrderID).Str("correlation_id", correlationID).Msg("Ticket successfully created for order")
 			}
 		}
 	}()

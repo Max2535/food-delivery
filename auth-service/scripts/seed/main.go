@@ -59,7 +59,7 @@ func main() {
 		},
 		{
 			Username: "testuser",
-			Password: "TestPassword123!",
+			Password: "TestPass123!",
 			Email:    "testuser@example.com",
 			Role:     "user",
 		},

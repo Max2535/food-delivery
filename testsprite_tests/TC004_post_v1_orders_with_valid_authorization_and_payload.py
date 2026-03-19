@@ -8,7 +8,7 @@ def test_post_v1_orders_with_valid_authorization_and_payload():
     login_url = f"{BASE_URL}/v1/auth/login"
     login_payload = {
         "username": "testuser",
-        "password": "TestPassword123!"
+        "password": "TestPass123!"
     }
     login_headers = {
         "Content-Type": "application/json"

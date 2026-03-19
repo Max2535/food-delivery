@@ -9,7 +9,7 @@ def get_jwt_token():
     login_url = f"{BASE_URL}/v1/auth/login"
     login_payload = {
         "username": "testuser",
-        "password": "P@ssw0rd123"
+        "password": "TestPass123!"
     }
     try:
         resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)

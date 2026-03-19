@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"kitchen-service/internal/model"
@@ -136,5 +137,19 @@ func (h *KitchenHandler) GetStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(ticket)
+	var items interface{}
+	if err := json.Unmarshal([]byte(ticket.Items), &items); err != nil {
+		items = []interface{}{}
+	}
+
+	return c.JSON(fiber.Map{
+		"status": ticket.Status,
+		"ticket": fiber.Map{
+			"id":         ticket.ID,
+			"order_id":   ticket.OrderID,
+			"items":      items,
+			"status":     ticket.Status,
+			"created_at": ticket.CreatedAt,
+		},
+	})
 }

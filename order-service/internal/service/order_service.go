@@ -99,7 +99,7 @@ func (s *orderService) publishToKitchen(order *model.Order, correlationID string
 	// 3. เตรียมข้อมูล JSON
 	body, _ := json.Marshal(map[string]interface{}{
 		"order_id": order.ID,
-		"items":    "[]", // TODO: Implement Order Items in Model
+		"items":    order.Items,
 	})
 
 	// ใช้ correlationID ที่รับมาจาก Gateway แทนการสร้างใหม่

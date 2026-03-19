@@ -79,6 +79,7 @@
     {
       "endpoint": "/v1/catalog/menus",
       "method": "POST",
+      "output_encoding": "no-op",
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -92,7 +93,8 @@
       "backend": [
         {
           "url_pattern": "/api/v1/catalog/menus",
-          "host": ["http://catalog-service-api:3003"]
+          "host": ["http://catalog-service-api:3003"],
+          "encoding": "no-op"
         }
       ]
     },

@@ -136,13 +136,13 @@ func main() {
 		case d := <-msgs:
 			log.Info().Str("service", "kitchen-worker").Msgf(" [x] Received %s", d.Body)
 			var payload struct {
-				OrderID uint   `json:"order_id"`
-				Items   string `json:"items"`
+				OrderID uint            `json:"order_id"`
+				Items   json.RawMessage `json:"items"`
 			}
 			if err := json.Unmarshal(d.Body, &payload); err == nil {
 				ticket := &model.KitchenTicket{
 					OrderID: payload.OrderID,
-					Items:   payload.Items,
+					Items:   string(payload.Items),
 				}
 				correlationID := d.CorrelationId
 				if correlationID == "" {

@@ -6,7 +6,10 @@ import (
 
 type Order struct {
 	// ใช้ uint เป็น ID ตามมาตรฐาน GORM พร้อมกำหนด auto-increment
-	ID uint `gorm:"primaryKey;autoIncrement" json:"order_id"`
+	ID uint `gorm:"primaryKey;autoIncrement" json:"id"`
+
+	// OrderID is an alias for ID to support legacy clients/tests that expect order_id
+	OrderID uint `gorm:"-" json:"order_id"`
 
 	// CustomerID ควรเป็น string (UUID) เพื่อรองรับการเชื่อมโยงกับ Identity Service อื่น
 	CustomerID string `gorm:"type:varchar(100);not null" json:"customer_id"`
