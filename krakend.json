@@ -22,6 +22,7 @@
     {
       "endpoint": "/v1/orders",
       "method": "POST",
+      "output_encoding": "no-op",
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -38,7 +39,8 @@
       "backend": [
         {
           "url_pattern": "/api/v1/orders",
-          "host": ["http://order-service-api:3000"]
+          "host": ["http://order-service-api:3000"],
+          "encoding": "no-op"
         }
       ]
     },

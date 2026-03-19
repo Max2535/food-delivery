@@ -42,16 +42,25 @@ func main() {
 		{
 			Username: "admin",
 			Password: "password",
+			Email:    "admin@example.com",
 			Role:     "admin",
 		},
 		{
 			Username: "user",
 			Password: "password",
+			Email:    "user@example.com",
 			Role:     "user",
 		},
 		{
 			Username: "validuser",
 			Password: "validpassword",
+			Email:    "validuser@example.com",
+			Role:     "user",
+		},
+		{
+			Username: "testuser",
+			Password: "TestPassword123!",
+			Email:    "testuser@example.com",
 			Role:     "user",
 		},
 	}

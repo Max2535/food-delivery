@@ -6,7 +6,7 @@ import (
 
 type Order struct {
 	// ใช้ uint เป็น ID ตามมาตรฐาน GORM พร้อมกำหนด auto-increment
-	ID uint `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID uint `gorm:"primaryKey;autoIncrement" json:"order_id"`
 
 	// CustomerID ควรเป็น string (UUID) เพื่อรองรับการเชื่อมโยงกับ Identity Service อื่น
 	CustomerID string `gorm:"type:varchar(100);not null" json:"customer_id"`
@@ -19,7 +19,17 @@ type Order struct {
 	// DeliveryAddress stores the snapshot of the customer address at the time of ordering
 	DeliveryAddress string `gorm:"type:text" json:"delivery_address"`
 
+	// Items is the list of items in the order
+	Items []OrderItem `gorm:"foreignKey:OrderID" json:"items"`
+
 	// GORM จะจัดการค่า CreatedAt และ UpdatedAt ให้โดยอัตโนมัติ
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type OrderItem struct {
+	ID         uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID    uint    `gorm:"not null" json:"order_id"`
+	MenuItemID string  `gorm:"type:varchar(100);not null" json:"menu_item_id"`
+	Quantity   int     `gorm:"not null" json:"quantity"`
 }
