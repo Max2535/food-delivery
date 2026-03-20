@@ -12,6 +12,7 @@ type MenuItem struct {
 	IsAvailable bool      `gorm:"default:true" json:"is_available"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	BOM         []BOMItem `gorm:"foreignKey:MenuItemID" json:"bom,omitempty"`
 }
 
 // Ingredient represents a raw material used in recipes

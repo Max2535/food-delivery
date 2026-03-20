@@ -12,7 +12,7 @@ Microservices-based food delivery backend written in Go. Five main services (aut
 food-delivery/
 ├── auth-service/        # JWT issuance, user management
 ├── order-service/       # Order CRUD + RabbitMQ publisher
-├── kitchen-service/     # Kitchen tickets + Priority Queue + Worker process
+├── kitchen-service/     # Kitchen tickets + RabbitMQ consumer worker
 ├── catalog-service/     # Master data: menus, BOM, add-ons, portions, stations
 ├── inventory-service/   # Stock tracking, auto-deduction, low-stock alerts
 ├── gateway/             # KrakenD plugin (correlation ID injector)
@@ -241,14 +241,7 @@ CATALOG_SERVICE_URL=http://catalog-service-api:3003
 
 ## Testing
 
-### Automated Tests
-- **Kitchen Service:** Unit tests available in `internal/`.
-  ```bash
-  cd kitchen-service
-  go test -v ./internal/...
-  ```
-
-### Manual Testing Flow
+No automated test suite exists yet. Manual testing flow:
 
 ```bash
 # 1. Register
@@ -270,15 +263,7 @@ curl -X POST http://localhost:8080/v1/orders \
 # 4. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
 
-# 5. Check kitchen queue (Priority: 1=Urgent, 2=Normal, 3=Low)
-curl http://localhost:8080/v1/kitchen/queue
-
-# 6. Update status
-curl -X PATCH http://localhost:8080/v1/kitchen/tickets/1 \
-  -H "Content-Type: application/json" \
-  -d '{"status": "Preparing"}'
-
-# 7. Create a catalog menu item
+# 5. Create a catalog menu item
 curl -X POST http://localhost:8080/v1/catalog/menus \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \

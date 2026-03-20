@@ -61,6 +61,22 @@ func main() {
 	authSvc := service.NewAuthService(userRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
+	// Seed test users for TestSprite tests
+	log.Info().Msg("Seeding test users...")
+	testUsers := []model.User{
+		{Username: "validuser", Password: "validpassword", Email: "validuser@example.com"},
+		{Username: "testuser", Password: "TestPass123!", Email: "testuser@example.com"},
+		{Username: "seeded_user", Password: "seeded_password", Email: "seeded_user@example.com"},
+	}
+
+	for _, u := range testUsers {
+		if err := authSvc.Register(&u); err != nil {
+			log.Warn().Err(err).Str("username", u.Username).Msg("Could not seed user (it may already exist)")
+		} else {
+			log.Info().Str("username", u.Username).Msg("Seeded user successfully")
+		}
+	}
+
 	// Fiber Instance
 	app := fiber.New()
 

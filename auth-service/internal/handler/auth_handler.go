@@ -3,6 +3,8 @@ package handler
 import (
 	"auth-service/internal/model"
 	"auth-service/internal/service"
+	"fmt"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -58,8 +60,14 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.Register(&user); err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "SQLSTATE 23505") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Username or email already exists"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "User registered successfully"})
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "User registered successfully",
+		"user_id": fmt.Sprint(user.ID),
+	})
 }

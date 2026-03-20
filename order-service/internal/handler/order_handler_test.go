@@ -28,14 +28,6 @@ func (m *MockOrderService) CreateOrder(order *model.Order, correlationID string)
 	return args.Error(0)
 }
 
-func (m *MockOrderService) CreateOrderFromRequest(req *model.CreateOrderRequest, correlationID string) (*model.Order, error) {
-	args := m.Called(req, correlationID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*model.Order), args.Error(1)
-}
-
 func (m *MockOrderService) GetAllOrders() ([]model.Order, error) {
 	args := m.Called()
 	return args.Get(0).([]model.Order), args.Error(1)
@@ -67,24 +59,11 @@ func TestCreateOrder_Success(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	resultOrder := &model.Order{
-		CustomerID:  "CUST001",
-		TotalAmount: 220.0,
-		Status:      "pending",
-		Items: []model.OrderItem{
-			{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 2, TotalPrice: 100},
-			{MenuItemID: 2, MenuItemName: "ต้มยำกุ้ง", UnitPrice: 120, Quantity: 1, TotalPrice: 120},
-		},
-	}
-
-	mockSvc.On("CreateOrderFromRequest", mock.AnythingOfType("*model.CreateOrderRequest"), mock.AnythingOfType("string")).Return(resultOrder, nil)
+	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order"), mock.AnythingOfType("string")).Return(nil)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"customer_id": "CUST001",
-		"items": []map[string]interface{}{
-			{"menu_item_id": 1, "menu_item_name": "ผัดกะเพรา", "unit_price": 50, "quantity": 2},
-			{"menu_item_id": 2, "menu_item_name": "ต้มยำกุ้ง", "unit_price": 120, "quantity": 1},
-		},
+		"customer_id":  "CUST001",
+		"total_amount": 150.0,
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders/", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -109,53 +88,13 @@ func TestCreateOrder_InvalidJSON(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestCreateOrder_MissingCustomerID(t *testing.T) {
-	mockSvc := new(MockOrderService)
-	app := setupApp(mockSvc)
-
-	body, _ := json.Marshal(map[string]interface{}{
-		"items": []map[string]interface{}{
-			{"menu_item_id": 1, "menu_item_name": "ผัดกะเพรา", "unit_price": 50, "quantity": 1},
-		},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders/", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-}
-
-func TestCreateOrder_NoItems(t *testing.T) {
-	mockSvc := new(MockOrderService)
-	app := setupApp(mockSvc)
-
-	body, _ := json.Marshal(map[string]interface{}{
-		"customer_id": "CUST001",
-		"items":       []map[string]interface{}{},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders/", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-}
-
 func TestCreateOrder_ServiceError(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	mockSvc.On("CreateOrderFromRequest", mock.AnythingOfType("*model.CreateOrderRequest"), mock.AnythingOfType("string")).Return(nil, errors.New("db error"))
+	mockSvc.On("CreateOrder", mock.AnythingOfType("*model.Order"), mock.AnythingOfType("string")).Return(errors.New("db error"))
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"customer_id": "CUST001",
-		"items": []map[string]interface{}{
-			{"menu_item_id": 1, "menu_item_name": "ผัดกะเพรา", "unit_price": 50, "quantity": 1},
-		},
-	})
+	body, _ := json.Marshal(map[string]interface{}{"customer_id": "CUST002"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders/", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -169,16 +108,7 @@ func TestGetAllOrders_ReturnsOrders(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	orders := []model.Order{
-		{
-			CustomerID:  "CUST001",
-			TotalAmount: 100,
-			Status:      "pending",
-			Items: []model.OrderItem{
-				{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 2, TotalPrice: 100},
-			},
-		},
-	}
+	orders := []model.Order{{CustomerID: "CUST001", TotalAmount: 100, Status: "pending"}}
 	mockSvc.On("GetAllOrders").Return(orders, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/", nil)
@@ -187,10 +117,10 @@ func TestGetAllOrders_ReturnsOrders(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	respBody, _ := io.ReadAll(resp.Body)
-	var result map[string][]model.Order
-	json.Unmarshal(respBody, &result)
-	assert.Len(t, result["orders"], 1)
+	body, _ := io.ReadAll(resp.Body)
+	var result []model.Order
+	json.Unmarshal(body, &result)
+	assert.Len(t, result, 1)
 	mockSvc.AssertExpectations(t)
 }
 
@@ -198,13 +128,7 @@ func TestGetOrderByID_Found(t *testing.T) {
 	mockSvc := new(MockOrderService)
 	app := setupApp(mockSvc)
 
-	order := &model.Order{
-		CustomerID:  "CUST001",
-		TotalAmount: 100,
-		Items: []model.OrderItem{
-			{MenuItemID: 1, MenuItemName: "ผัดกะเพรา", UnitPrice: 50, Quantity: 2, TotalPrice: 100},
-		},
-	}
+	order := &model.Order{CustomerID: "CUST001", TotalAmount: 100}
 	mockSvc.On("GetOrderByID", uint(1)).Return(order, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/1", nil)

@@ -21,33 +21,24 @@ func NewOrderHandler(service service.OrderService) *OrderHandler {
 
 // CreateOrder godoc
 // @Summary      Create a new order
-// @Description  Create a new order with items (menu snapshot pattern)
+// @Description  Create a new order based on provided data
 // @Tags         orders
 // @Accept       json
 // @Produce      json
-// @Param        order body model.CreateOrderRequest true "Order Data with Items"
+// @Param        order body model.Order true "Order Data"
 // @Success      201  {object}  model.Order
 // @Failure      400  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]interface{}
 // @Router       /api/v1/orders [post]
 func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
-	req := new(model.CreateOrderRequest)
-	if err := c.BodyParser(req); err != nil {
+	order := new(model.Order)
+	if err := c.BodyParser(order); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-	}
-
-	// Validate — ต้องมี customer_id และ items
-	if req.CustomerID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "customer_id is required"})
-	}
-	if len(req.Items) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "at least one item is required"})
 	}
 
 	correlationID, _ := c.Locals("correlationID").(string)
 
-	order, err := h.service.CreateOrderFromRequest(req, correlationID)
-	if err != nil {
+	if err := h.service.CreateOrder(order, correlationID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -55,15 +46,15 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		Str("service", "order-service").
 		Str("order_id", fmt.Sprint(order.ID)).
 		Str("correlation_id", correlationID).
-		Int("item_count", len(order.Items)).
 		Msg("Order created successfully")
 
+	order.OrderID = order.ID
 	return c.Status(fiber.StatusCreated).JSON(order)
 }
 
 // GetAllOrders godoc
 // @Summary      Get all orders
-// @Description  Get a list of all orders with their items
+// @Description  Get a list of all orders
 // @Tags         orders
 // @Produce      json
 // @Success      200  {array}   model.Order
@@ -83,12 +74,15 @@ func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 		Int("count", len(orders)).
 		Msg("Fetched all orders")
 
-	return c.JSON(fiber.Map{"orders": orders})
+	for i := range orders {
+		orders[i].OrderID = orders[i].ID
+	}
+	return c.JSON(orders)
 }
 
 // GetOrderByID godoc
 // @Summary      Get an order by ID
-// @Description  Get detailed information about a specific order by its ID, including items
+// @Description  Get detailed information about a specific order by its ID
 // @Tags         orders
 // @Produce      json
 // @Param        id   path      int  true  "Order ID"
@@ -116,5 +110,6 @@ func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 		Int("order_id", id).
 		Msg("Fetched order by ID")
 
+	order.OrderID = order.ID
 	return c.JSON(order)
 }

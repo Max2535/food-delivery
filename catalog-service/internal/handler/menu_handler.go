@@ -89,6 +89,13 @@ func (h *MenuHandler) CreateMenuItem(c *fiber.Ctx) error {
 	if item.Name == "" || item.Price <= 0 || item.Category == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, price, and category are required"})
 	}
+
+	// Validate BOM
+	for _, bom := range item.BOM {
+		if (bom.IngredientID == nil && bom.SubMenuItemID == nil) || (bom.IngredientID != nil && bom.SubMenuItemID != nil) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "each BOM item must have either ingredient_id or sub_menu_item_id, but not both"})
+		}
+	}
 	if err := h.menuService.CreateMenuItem(item); err != nil {
 		if err == service.ErrMenuItemAlreadyExists {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})

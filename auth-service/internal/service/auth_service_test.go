@@ -30,25 +30,27 @@ func TestAuthService_Register(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestAuthService_Login_Success(t *testing.T) {
+func TestTC_AUTH_001_Login_Success(t *testing.T) {
 	mockRepo := new(repository.MockUserRepository)
 	svc := NewAuthService(mockRepo)
 
-	os.Setenv("JWT_SECRET", "test_secret")
+	// Set up environment for RS256 signing
+	os.Setenv("PRIVATE_KEY_PATH", "../../private_key.pem")
 
-	password := "password123"
+	password := "Password123!"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
 	user := &model.User{
-		Username: "testuser",
+		Username: "customer@test.com",
 		Password: string(hashedPassword),
+		Role:     "customer",
 	}
 	user.ID = 1
 
-	mockRepo.On("FindByUsername", "testuser").Return(user, nil)
+	mockRepo.On("FindByUsername", "customer@test.com").Return(user, nil)
 
 	req := model.LoginRequest{
-		Username: "testuser",
+		Username: "customer@test.com",
 		Password: password,
 	}
 
@@ -60,23 +62,23 @@ func TestAuthService_Login_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestAuthService_Login_InvalidPassword(t *testing.T) {
+func TestTC_AUTH_003_Login_InvalidCredentials(t *testing.T) {
 	mockRepo := new(repository.MockUserRepository)
 	svc := NewAuthService(mockRepo)
 
-	password := "password123"
+	password := "Password123!"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
 	user := &model.User{
-		Username: "testuser",
+		Username: "customer@test.com",
 		Password: string(hashedPassword),
 	}
 
-	mockRepo.On("FindByUsername", "testuser").Return(user, nil)
+	mockRepo.On("FindByUsername", "customer@test.com").Return(user, nil)
 
 	req := model.LoginRequest{
-		Username: "testuser",
-		Password: "wrongpassword",
+		Username: "customer@test.com",
+		Password: "WrongPassword",
 	}
 
 	resp, err := svc.Login(req)
@@ -86,3 +88,9 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	assert.Equal(t, "invalid username or password", err.Error())
 	mockRepo.AssertExpectations(t)
 }
+
+
+// Note: TC-AUTH-002: Token Expired is typically an integration test on the middleware/gateway 
+// or requires mocking time in the token generation or using a parser with specific verification.
+// Since generateToken is internal and uses time.Now(), it's better verified at the handler/middleware level.
+

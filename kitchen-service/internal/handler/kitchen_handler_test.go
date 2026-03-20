@@ -32,12 +32,12 @@ func (m *MockKitchenService) UpdateStatus(orderID uint, status string) error {
 	return args.Error(0)
 }
 
-func (m *MockKitchenService) GetQueue() ([]*model.KitchenTicket, error) {
-	args := m.Called()
+func (m *MockKitchenService) GetByOrderID(orderID uint) (*model.KitchenTicket, error) {
+	args := m.Called(orderID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*model.KitchenTicket), args.Error(1)
+	return args.Get(0).(*model.KitchenTicket), args.Error(1)
 }
 
 // --- Helper ---
@@ -48,7 +48,7 @@ func setupApp(svc *MockKitchenService) *fiber.App {
 	api := app.Group("/api/v1/kitchen")
 	api.Post("/tickets", h.CreateTicket)
 	api.Patch("/tickets/:orderId", h.UpdateStatus)
-	api.Get("/queue", h.GetQueue)
+	api.Get("/orders/:orderId", h.GetStatus)
 	return app
 }
 
@@ -148,23 +148,5 @@ func TestUpdateStatus_ServiceError(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
-	mockSvc.AssertExpectations(t)
-}
-
-func TestGetQueue_Success(t *testing.T) {
-	mockSvc := new(MockKitchenService)
-	app := setupApp(mockSvc)
-
-	mockTickets := []*model.KitchenTicket{
-		{OrderID: 1, Priority: model.PriorityUrgent, Status: model.StatusPending},
-		{OrderID: 2, Priority: model.PriorityNormal, Status: model.StatusPreparing},
-	}
-	mockSvc.On("GetQueue").Return(mockTickets, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/kitchen/queue", nil)
-	resp, err := app.Test(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	mockSvc.AssertExpectations(t)
 }

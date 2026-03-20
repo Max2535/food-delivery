@@ -25,7 +25,6 @@ KrakenD API Gateway (port 8080)
   ├──► Kitchen Service (port 3001)                    RabbitMQ (port 5672)
   │      ├── PostgreSQL (kitchen_db)                      │
   │      ├── Consul Registration                          │
-  │      ├── Cooking Queue Management (Priority + FIFO)   │
   │      └── Kitchen Worker ◄────────────────────────────┘
   │            └── Consumes order.created events
   │
@@ -55,8 +54,8 @@ Observability:
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
 | Auth Service | 3005 | User registration, login, JWT issuance |
 | Order Service | 3000 | Order CRUD, publishes order events |
-| Kitchen Service | 3001 | Priority Queue Management, status workflow, ticket history |
-| Kitchen Worker | — | RabbitMQ consumer (creates Tickets with default priority) |
+| Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
+| Kitchen Worker | — | RabbitMQ consumer (separate process) |
 | Catalog Service | 3003 | Master data: menus, BOM, add-ons, portions, stations |
 | Inventory Service | 3004 | Raw material stock, auto-deduction, low-stock alerts |
 | Inventory Worker | — | RabbitMQ consumer for kitchen.ticket_created events |
@@ -145,20 +144,6 @@ curl -X POST http://localhost:8080/v1/orders \
 #### Check Kitchen Status
 ```bash
 curl http://localhost:8080/v1/kitchen/status/{orderId}
-```
-
-#### Get Cooking Queue
-Returns a prioritized list of active tickets (Urgent > Normal > Low, then FIFO).
-```bash
-curl http://localhost:8080/v1/kitchen/queue
-```
-
-#### Update Ticket Status
-```bash
-# Available statuses: Pending, Preparing, Ready to Serve, Served
-curl -X PATCH http://localhost:8080/v1/kitchen/tickets/{orderId} \
-  -H "Content-Type: application/json" \
-  -d '{"status": "Ready to Serve"}'
 ```
 
 ### Catalog
@@ -351,17 +336,8 @@ sequenceDiagram
   OrderService → RabbitMQ: Publish order.created event
   OrderService → Client: 201 Created
   RabbitMQ → KitchenWorker: Deliver event
-  KitchenWorker → PostgreSQL: Create KitchenTicket (status: Pending, priority: 2)
+  KitchenWorker → PostgreSQL: Create KitchenTicket (status: Received)
 ```
-
-### Cooking Queue Priority
-Orders are processed in the kitchen based on:
-1. **Priority Level:** 1 (Urgent) > 2 (Normal) > 3 (Low)
-2. **Time Created:** First-In-First-Out (FIFO) within the same priority level.
-
-### Status Workflow
-Tickets progress through:
-`Pending` (New) → `Preparing` (Cooking) → `Ready to Serve` (Finished) → `Served` (Archived)
 
 ## Event-Driven Architecture
 
@@ -556,7 +532,7 @@ id, customer_id, total_amount (decimal 10,2), status (default: Pending), created
 
 **kitchen_tickets** (kitchen_db)
 ```
-id, order_id (unique), items (JSON), status (Pending|Preparing|Ready to Serve|Served), priority (1|2|3), created_at
+id, order_id (unique), items (JSON), status (Received|Cooking|Ready), created_at
 ```
 
 **menu_items** (catalog_db)
