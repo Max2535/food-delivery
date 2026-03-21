@@ -27,6 +27,21 @@ func NewAuthService(repo repository.UserRepository) AuthService {
 
 func (s *authService) Register(user *model.User) error {
 	log.Info().Str("username", user.Username).Msg("Registering user")
+
+	// Default role to "user" if not provided
+	if user.Role == "" {
+		user.Role = model.RoleUser
+	}
+
+	// Validate role
+	switch user.Role {
+	case model.RoleUser, model.RoleAdmin, model.RoleRider, model.RoleMerchant, model.RoleCustomer:
+		// Valid role
+	default:
+		log.Warn().Str("role", user.Role).Msg("Invalid role provided during registration")
+		return errors.New("invalid role: " + user.Role)
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to hash password")
@@ -63,7 +78,7 @@ func (s *authService) Login(req model.LoginRequest) (*model.LoginResponse, error
 	}
 
 	log.Info().Str("username", req.Username).Msg("Login successful")
-	return &model.LoginResponse{Token: token}, nil
+	return &model.LoginResponse{Token: token, Role: user.Role}, nil
 }
 
 func (s *authService) generateToken(user *model.User) (string, error) {
@@ -84,7 +99,7 @@ func (s *authService) generateToken(user *model.User) (string, error) {
 
 	role := user.Role
 	if role == "" {
-		role = "user"
+		role = model.RoleUser
 	}
 
 	claims := jwt.MapClaims{

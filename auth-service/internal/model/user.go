@@ -2,6 +2,14 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	RoleUser     = "user"
+	RoleAdmin    = "admin"
+	RoleRider    = "rider"
+	RoleMerchant = "merchant"
+	RoleCustomer = "customer"
+)
+
 type User struct {
 	gorm.Model
 	Username string `gorm:"uniqueIndex;not null" json:"username"`
@@ -17,4 +25,5 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	Token string `json:"token"`
+	Role  string `json:"role"`
 }

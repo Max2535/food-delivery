@@ -43,25 +43,25 @@ func main() {
 			Username: "admin",
 			Password: "password",
 			Email:    "admin@example.com",
-			Role:     "admin",
+			Role:     model.RoleAdmin,
+		},
+		{
+			Username: "rider_01",
+			Password: "securepassword123",
+			Email:    "rider01@example.com",
+			Role:     model.RoleRider,
 		},
 		{
 			Username: "user",
 			Password: "password",
 			Email:    "user@example.com",
-			Role:     "user",
+			Role:     model.RoleUser,
 		},
 		{
 			Username: "validuser",
 			Password: "validpassword",
 			Email:    "validuser@example.com",
-			Role:     "user",
-		},
-		{
-			Username: "testuser",
-			Password: "TestPass123!",
-			Email:    "testuser@example.com",
-			Role:     "user",
+			Role:     model.RoleUser,
 		},
 	}
 

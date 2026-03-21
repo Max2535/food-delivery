@@ -9,12 +9,13 @@ import (
 	"os"
 	"time"
 
+	_ "auth-service/docs" // Swagger docs
+
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
+	swagger "github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	_ "auth-service/docs" // Swagger docs
-	swagger "github.com/gofiber/swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -54,7 +55,7 @@ func main() {
 	}
 
 	// Auto Migrate
-	db.AutoMigrate(&model.User{})
+	db.AutoMigrate(&model.User{}, &model.Role{})
 
 	// Initialize Layers
 	userRepo := repository.NewUserRepository(db)
@@ -64,9 +65,10 @@ func main() {
 	// Seed test users for TestSprite tests
 	log.Info().Msg("Seeding test users...")
 	testUsers := []model.User{
-		{Username: "validuser", Password: "validpassword", Email: "validuser@example.com"},
-		{Username: "testuser", Password: "TestPass123!", Email: "testuser@example.com"},
-		{Username: "seeded_user", Password: "seeded_password", Email: "seeded_user@example.com"},
+		{Username: "admin", Password: "adminpassword", Email: "admin@food-delivery.com", Role: model.RoleAdmin},
+		{Username: "rider_01", Password: "securepassword123", Email: "rider01@food-delivery.com", Role: model.RoleRider},
+		{Username: "customer_01", Password: "password123", Email: "customer@food-delivery.com", Role: model.RoleCustomer},
+		{Username: "validuser", Password: "validpassword", Email: "validuser@example.com", Role: model.RoleUser},
 	}
 
 	for _, u := range testUsers {

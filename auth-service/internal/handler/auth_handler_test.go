@@ -25,7 +25,7 @@ func TestAuthHandler_Login(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(reqBody)
 
-	mockSvc.On("Login", reqBody).Return(&model.LoginResponse{Token: "test_token"}, nil)
+	mockSvc.On("Login", reqBody).Return(&model.LoginResponse{Token: "test_token", Role: "user"}, nil)
 
 	req := httptest.NewRequest("POST", "/login", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -37,6 +37,7 @@ func TestAuthHandler_Login(t *testing.T) {
 	var loginResp model.LoginResponse
 	json.NewDecoder(resp.Body).Decode(&loginResp)
 	assert.Equal(t, "test_token", loginResp.Token)
+	assert.Equal(t, "user", loginResp.Role)
 
 	mockSvc.AssertExpectations(t)
 }
