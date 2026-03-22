@@ -79,6 +79,135 @@ func main() {
 		&model.MenuPortionSize{},
 	)
 
+	// Seed ingredients
+	seedIngredients := []model.Ingredient{
+		{Name: "ข้าวสวย", Unit: "g"},
+		{Name: "หมูสับ", Unit: "g"},
+		{Name: "ใบกะเพรา", Unit: "g"},
+		{Name: "กระเทียม", Unit: "g"},
+		{Name: "พริกขี้หนู", Unit: "g"},
+		{Name: "น้ำมันพืช", Unit: "ml"},
+		{Name: "ไข่ไก่", Unit: "piece"},
+		{Name: "น้ำปลา", Unit: "ml"},
+		{Name: "น้ำตาลทราย", Unit: "g"},
+		{Name: "ซอสหอยนางรม", Unit: "ml"},
+		{Name: "เนื้อไก่", Unit: "g"},
+		{Name: "ผักบุ้ง", Unit: "g"},
+		{Name: "เส้นใหญ่", Unit: "g"},
+		{Name: "กุ้งสด", Unit: "g"},
+		{Name: "ปลากระพง", Unit: "g"},
+		{Name: "ซีอิ๊วดำ", Unit: "ml"},
+		{Name: "พริกแห้ง", Unit: "g"},
+		{Name: "มะนาว", Unit: "piece"},
+		{Name: "ผักกาดดอง", Unit: "g"},
+		{Name: "ถั่วลิสง", Unit: "g"},
+	}
+	for i := range seedIngredients {
+		var existing model.Ingredient
+		if err := db.Where("name = ?", seedIngredients[i].Name).First(&existing).Error; err != nil {
+			db.Create(&seedIngredients[i])
+			log.Info().Str("ingredient", seedIngredients[i].Name).Msg("Seeded ingredient")
+		}
+	}
+
+	// Seed menu items
+	seedMenus := []model.MenuItem{
+		{Name: "ข้าวผัดกระเพราหมูสับ", Price: 65, Category: "อาหารจานเดียว"},
+		{Name: "ข้าวผัดกระเพราไก่", Price: 65, Category: "อาหารจานเดียว"},
+		{Name: "ผัดไทกุ้งสด", Price: 85, Category: "อาหารจานเดียว"},
+		{Name: "ผัดผักบุ้งไฟแดง", Price: 60, Category: "อาหารผัด"},
+		{Name: "ปลากระพงทอดน้ำปลา", Price: 180, Category: "อาหารทอด"},
+	}
+	for i := range seedMenus {
+		var existing model.MenuItem
+		if err := db.Where("name = ?", seedMenus[i].Name).First(&existing).Error; err != nil {
+			db.Create(&seedMenus[i])
+			log.Info().Str("menu", seedMenus[i].Name).Msg("Seeded menu item")
+		}
+	}
+
+	// Seed BOM (recipes) — link menu items to ingredients
+	// Helper: find IDs after seeding
+	ingredientIDByName := func(name string) *uint {
+		var ing model.Ingredient
+		if err := db.Where("name = ?", name).First(&ing).Error; err != nil {
+			return nil
+		}
+		return &ing.ID
+	}
+	menuIDByName := func(name string) uint {
+		var m model.MenuItem
+		db.Where("name = ?", name).First(&m)
+		return m.ID
+	}
+
+	type bomSeed struct {
+		MenuName       string
+		IngredientName string
+		Quantity       float64
+	}
+	bomSeeds := []bomSeed{
+		// ข้าวผัดกระเพราหมูสับ
+		{"ข้าวผัดกระเพราหมูสับ", "ข้าวสวย", 250},
+		{"ข้าวผัดกระเพราหมูสับ", "หมูสับ", 150},
+		{"ข้าวผัดกระเพราหมูสับ", "ใบกะเพรา", 20},
+		{"ข้าวผัดกระเพราหมูสับ", "กระเทียม", 15},
+		{"ข้าวผัดกระเพราหมูสับ", "พริกขี้หนู", 10},
+		{"ข้าวผัดกระเพราหมูสับ", "น้ำมันพืช", 30},
+		{"ข้าวผัดกระเพราหมูสับ", "น้ำปลา", 15},
+		{"ข้าวผัดกระเพราหมูสับ", "น้ำตาลทราย", 5},
+		{"ข้าวผัดกระเพราหมูสับ", "ซอสหอยนางรม", 10},
+		// ข้าวผัดกระเพราไก่
+		{"ข้าวผัดกระเพราไก่", "ข้าวสวย", 250},
+		{"ข้าวผัดกระเพราไก่", "เนื้อไก่", 150},
+		{"ข้าวผัดกระเพราไก่", "ใบกะเพรา", 20},
+		{"ข้าวผัดกระเพราไก่", "กระเทียม", 15},
+		{"ข้าวผัดกระเพราไก่", "พริกขี้หนู", 10},
+		{"ข้าวผัดกระเพราไก่", "น้ำมันพืช", 30},
+		{"ข้าวผัดกระเพราไก่", "น้ำปลา", 15},
+		{"ข้าวผัดกระเพราไก่", "น้ำตาลทราย", 5},
+		{"ข้าวผัดกระเพราไก่", "ซอสหอยนางรม", 10},
+		// ผัดไทกุ้งสด
+		{"ผัดไทกุ้งสด", "เส้นใหญ่", 200},
+		{"ผัดไทกุ้งสด", "กุ้งสด", 100},
+		{"ผัดไทกุ้งสด", "ไข่ไก่", 1},
+		{"ผัดไทกุ้งสด", "น้ำปลา", 20},
+		{"ผัดไทกุ้งสด", "น้ำตาลทราย", 30},
+		{"ผัดไทกุ้งสด", "ถั่วลิสง", 20},
+		{"ผัดไทกุ้งสด", "ผักบุ้ง", 30},
+		{"ผัดไทกุ้งสด", "มะนาว", 1},
+		// ผัดผักบุ้งไฟแดง
+		{"ผัดผักบุ้งไฟแดง", "ผักบุ้ง", 200},
+		{"ผัดผักบุ้งไฟแดง", "กระเทียม", 20},
+		{"ผัดผักบุ้งไฟแดง", "พริกแห้ง", 10},
+		{"ผัดผักบุ้งไฟแดง", "น้ำมันพืช", 40},
+		{"ผัดผักบุ้งไฟแดง", "ซอสหอยนางรม", 15},
+		{"ผัดผักบุ้งไฟแดง", "น้ำปลา", 10},
+		// ปลากระพงทอดน้ำปลา
+		{"ปลากระพงทอดน้ำปลา", "ปลากระพง", 400},
+		{"ปลากระพงทอดน้ำปลา", "กระเทียม", 30},
+		{"ปลากระพงทอดน้ำปลา", "พริกขี้หนู", 15},
+		{"ปลากระพงทอดน้ำปลา", "น้ำปลา", 30},
+		{"ปลากระพงทอดน้ำปลา", "น้ำมันพืช", 500},
+		{"ปลากระพงทอดน้ำปลา", "มะนาว", 2},
+	}
+	for _, b := range bomSeeds {
+		menuID := menuIDByName(b.MenuName)
+		ingID := ingredientIDByName(b.IngredientName)
+		if menuID == 0 || ingID == nil {
+			continue
+		}
+		var existing model.BOMItem
+		if err := db.Where("menu_item_id = ? AND ingredient_id = ?", menuID, *ingID).First(&existing).Error; err != nil {
+			db.Create(&model.BOMItem{
+				MenuItemID:   menuID,
+				IngredientID: ingID,
+				Quantity:     b.Quantity,
+			})
+			log.Info().Str("menu", b.MenuName).Str("ingredient", b.IngredientName).Msg("Seeded BOM item")
+		}
+	}
+
 	// Repositories
 	menuRepo := repository.NewMenuRepository(db)
 	ingredientRepo := repository.NewIngredientRepository(db)

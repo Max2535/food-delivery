@@ -55,7 +55,22 @@ func main() {
 	}
 
 	// Auto Migrate
-	db.AutoMigrate(&model.User{}, &model.Role{})
+	err = db.AutoMigrate(&model.User{}, &model.Role{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to auto migrate")
+	}
+
+	// Seed Roles
+	roles := []string{model.RoleAdmin, model.RoleRider, model.RoleCustomer, model.RoleUser, model.RoleMerchant}
+	for _, roleName := range roles {
+		var role model.Role
+		if err := db.Where("name = ?", roleName).First(&role).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				db.Create(&model.Role{Name: roleName})
+				log.Info().Str("role", roleName).Msg("Seeded role successfully")
+			}
+		}
+	}
 
 	// Initialize Layers
 	userRepo := repository.NewUserRepository(db)
