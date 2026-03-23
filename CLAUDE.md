@@ -10,7 +10,8 @@ Microservices-based food delivery backend written in Go. Five main services (aut
 
 ```
 food-delivery/
-├── auth-service/        # JWT issuance, user management
+├── auth-service/        # JWT issuance, user management, password reset
+├── front-end/           # Next.js frontend (login, register, forgot/reset password, dashboard)
 ├── order-service/       # Order CRUD + RabbitMQ publisher
 ├── kitchen-service/     # Kitchen tickets + RabbitMQ consumer worker
 ├── catalog-service/     # Master data: menus, BOM, add-ons, portions, stations
@@ -67,12 +68,12 @@ docker-compose up -d --build inventory-worker
 | Auth Service | 3002 | 3005 |
 | Catalog Service | 3003 | 3003 |
 | Inventory Service | 3004 | 3004 |
-| PostgreSQL | 5432 | 5432 |
-| pgAdmin | 80 | 5050 |
+| PostgreSQL | 5432 | 5555 |
+| pgAdmin | 80 | 5551 |
 | RabbitMQ | 5672 | 5672 |
 | RabbitMQ UI | 15672 | 15672 |
 | Redis | 6379 | 6379 |
-| Redis Insight | 5540 | 8001 |
+| Redis Insight | 5540 | 8085 |
 | Consul | 8500 | 8500 |
 | Prometheus | 9090 | 9090 |
 | Grafana | 3000 | 3002 |
@@ -99,6 +100,8 @@ Never share a database between services. Each service owns its schema and connec
 | `/v1/auth/logout-all` | POST | JWT | Revoke all refresh tokens for user |
 | `/v1/auth/profile` | GET | JWT | Get current user profile |
 | `/v1/auth/password` | PUT | JWT | Change password |
+| `/v1/auth/forgot-password` | POST | No | Request password reset token (returns token in dev mode) |
+| `/v1/auth/reset-password` | POST | No | Reset password using token (revokes all refresh tokens) |
 
 Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`, `/v1/auth/profile`, `/v1/auth/logout-all`, `/v1/auth/password`
 
@@ -323,16 +326,26 @@ curl -X POST http://localhost:8080/v1/auth/logout \
 curl -X POST http://localhost:8080/v1/auth/logout-all \
   -H "Authorization: Bearer $TOKEN"
 
-# 8. Create order (JWT required)
+# 8. Forgot password (returns reset_token in dev mode)
+curl -X POST http://localhost:8080/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"t@t.com"}'
+
+# 9. Reset password (using token from step 8)
+curl -X POST http://localhost:8080/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<reset_token>","new_password":"resetpass123"}'
+
+# 10. Create order (JWT required)
 curl -X POST http://localhost:8080/v1/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"customer_id":"c1","total_amount":50.00}'
 
-# 9. Check kitchen ticket
+# 11. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
 
-# 10. Create a catalog menu item (JWT required)
+# 12. Create a catalog menu item (JWT required)
 curl -X POST http://localhost:8080/v1/catalog/menus \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
@@ -345,5 +358,5 @@ curl -X POST http://localhost:8080/v1/catalog/menus \
 - Prometheus: http://localhost:9090
 - RabbitMQ: http://localhost:15672 (guest/guest)
 - Consul: http://localhost:8500
-- Redis Insight: http://localhost:8001
-- pgAdmin: http://localhost:5050 (admin@admin.com/admin)
+- Redis Insight: http://localhost:8085
+- pgAdmin: http://localhost:5551 (admin@admin.com/admin)

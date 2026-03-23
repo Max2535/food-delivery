@@ -49,7 +49,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
 	}
 
@@ -68,7 +68,8 @@ func main() {
 	// Initialize Layers
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo)
+	resetTokenRepo := repository.NewPasswordResetTokenRepository(db)
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users
@@ -109,6 +110,8 @@ func main() {
 	auth.Post("/logout-all", authHandler.LogoutAll)
 	auth.Get("/profile", authHandler.GetProfile)
 	auth.Put("/password", authHandler.ChangePassword)
+	auth.Post("/forgot-password", authHandler.ForgotPassword)
+	auth.Post("/reset-password", authHandler.ResetPassword)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -20,6 +20,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrIncorrectPassword  = errors.New("current password is incorrect")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 type AuthService interface {
@@ -30,15 +31,22 @@ type AuthService interface {
 	LogoutAll(userID uint) error
 	GetProfile(userID uint) (*model.User, error)
 	ChangePassword(userID uint, currentPassword, newPassword string) error
+	ForgotPassword(email string) (string, error)
+	ResetPassword(token, newPassword string) error
 }
 
 type authService struct {
-	userRepo  repository.UserRepository
-	tokenRepo repository.RefreshTokenRepository
+	userRepo       repository.UserRepository
+	tokenRepo      repository.RefreshTokenRepository
+	resetTokenRepo repository.PasswordResetTokenRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository) AuthService {
-	return &authService{userRepo: userRepo, tokenRepo: tokenRepo}
+func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, resetTokenRepo ...repository.PasswordResetTokenRepository) AuthService {
+	s := &authService{userRepo: userRepo, tokenRepo: tokenRepo}
+	if len(resetTokenRepo) > 0 {
+		s.resetTokenRepo = resetTokenRepo[0]
+	}
+	return s
 }
 
 func (s *authService) Register(username, password, email string) (*model.User, error) {
@@ -107,6 +115,53 @@ func (s *authService) ChangePassword(userID uint, currentPassword, newPassword s
 		return err
 	}
 	return s.userRepo.UpdatePassword(userID, string(hashed))
+}
+
+func (s *authService) ForgotPassword(email string) (string, error) {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		return "", ErrUserNotFound
+	}
+
+	// ลบ token เก่าของ user คนนี้
+	_ = s.resetTokenRepo.DeleteByUserID(user.ID)
+
+	rawToken, err := generateRandomToken()
+	if err != nil {
+		return "", err
+	}
+	rt := &model.PasswordResetToken{
+		UserID:    user.ID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+	}
+	if err := s.resetTokenRepo.Create(rt); err != nil {
+		return "", err
+	}
+	return rawToken, nil
+}
+
+func (s *authService) ResetPassword(token, newPassword string) error {
+	hash := hashToken(token)
+	rt, err := s.resetTokenRepo.FindByTokenHash(hash)
+	if err != nil || rt.IsExpired() {
+		return ErrInvalidToken
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if err := s.userRepo.UpdatePassword(rt.UserID, string(hashed)); err != nil {
+		return err
+	}
+
+	// ลบ token หลังใช้งาน
+	_ = s.resetTokenRepo.DeleteByTokenHash(hash)
+	// ลบ refresh tokens ทั้งหมดเพื่อบังคับ login ใหม่
+	_ = s.tokenRepo.DeleteByUserID(rt.UserID)
+
+	return nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

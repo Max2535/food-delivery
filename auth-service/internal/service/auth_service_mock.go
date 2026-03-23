@@ -56,3 +56,13 @@ func (m *MockAuthService) ChangePassword(userID uint, currentPassword, newPasswo
 	args := m.Called(userID, currentPassword, newPassword)
 	return args.Error(0)
 }
+
+func (m *MockAuthService) ForgotPassword(email string) (string, error) {
+	args := m.Called(email)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) ResetPassword(token, newPassword string) error {
+	args := m.Called(token, newPassword)
+	return args.Error(0)
+}

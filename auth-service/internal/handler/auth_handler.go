@@ -258,6 +258,88 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "password changed — please login again"})
 }
 
+// ForgotPassword godoc
+// @Summary      Request password reset
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{email=string} true "Forgot password request"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Router       /api/v1/auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email is required"})
+	}
+
+	token, err := h.authService.ForgotPassword(req.Email)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			// ไม่เปิดเผยว่า email ไม่มีในระบบ เพื่อความปลอดภัย
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"message": "if the email exists, a reset link has been sent",
+			})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("forgot password failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	// ในระบบจริงจะส่ง email — ตอนนี้ log token สำหรับ development
+	log.Info().
+		Str("correlation_id", correlationID).
+		Str("reset_token", token).
+		Str("email", req.Email).
+		Msg("password reset token generated (dev mode — would send email in production)")
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":     "if the email exists, a reset link has been sent",
+		"reset_token": token, // TODO: ลบออกเมื่อมี email service จริง
+	})
+}
+
+// ResetPassword godoc
+// @Summary      Reset password with token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{token=string,new_password=string} true "Reset password request"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router       /api/v1/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.Token == "" || req.NewPassword == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token and new_password are required"})
+	}
+	if len(req.NewPassword) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "new password must be at least 8 characters"})
+	}
+
+	if err := h.authService.ResetPassword(req.Token, req.NewPassword); err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid or expired reset token"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("reset password failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Msg("password reset successfully")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "password has been reset — please login with your new password"})
+}
+
 // ── Helper ───────────────────────────────────────────────────────
 
 func extractUserID(c *fiber.Ctx) (uint, error) {

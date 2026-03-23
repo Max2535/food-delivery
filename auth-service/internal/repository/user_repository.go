@@ -8,6 +8,7 @@ import (
 type UserRepository interface {
 	Create(user *model.User) error
 	FindByUsername(username string) (*model.User, error)
+	FindByEmail(email string) (*model.User, error)
 	FindByID(id uint) (*model.User, error)
 	UpdatePassword(id uint, hashedPassword string) error
 }
@@ -27,6 +28,12 @@ func (r *userRepository) Create(user *model.User) error {
 func (r *userRepository) FindByUsername(username string) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("username = ?", username).First(&user).Error
+	return &user, err
+}
+
+func (r *userRepository) FindByEmail(email string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("email = ?", email).First(&user).Error
 	return &user, err
 }
 

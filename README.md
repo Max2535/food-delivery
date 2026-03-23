@@ -43,8 +43,8 @@ Observability:
   Loki (3100) ◄── Promtail ◄── Docker logs
   Consul UI (8500) ◄── service registry
   RabbitMQ UI (15672) ◄── message broker management
-  Redis Insight (8001) ◄── Redis browser
-  pgAdmin (5050) ◄── PostgreSQL browser
+  Redis Insight (8085) ◄── Redis browser
+  pgAdmin (5551) ◄── PostgreSQL browser
 ```
 
 ## Services
@@ -52,7 +52,7 @@ Observability:
 | Service | Port | Responsibility |
 |---------|------|----------------|
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
-| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management |
+| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset |
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
@@ -105,8 +105,8 @@ docker-compose ps
 | Prometheus | http://localhost:9090 | — |
 | RabbitMQ UI | http://localhost:15672 | guest / guest |
 | Consul UI | http://localhost:8500 | — |
-| Redis Insight | http://localhost:8001 | — |
-| pgAdmin | http://localhost:5050 | admin@admin.com / admin |
+| Redis Insight | http://localhost:8085 | — |
+| pgAdmin | http://localhost:5551 | admin@admin.com / admin |
 | Order Swagger | http://localhost:3000/swagger/index.html | — |
 | Auth Swagger | http://localhost:3002/swagger/index.html | — |
 
@@ -162,6 +162,23 @@ curl -X POST http://localhost:8080/v1/auth/logout \
 ```bash
 curl -X POST http://localhost:8080/v1/auth/logout-all \
   -H "Authorization: Bearer $TOKEN"
+```
+
+#### Forgot Password (request reset token)
+```bash
+curl -X POST http://localhost:8080/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com"}'
+# Dev mode: returns reset_token in response body
+# Production: integrate email service to send token via email
+```
+
+#### Reset Password (using reset token)
+```bash
+curl -X POST http://localhost:8080/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "<reset_token>", "new_password": "newsecret123"}'
+# Revokes all refresh tokens to force re-login on all devices
 ```
 
 ### Orders (requires JWT)
@@ -410,8 +427,10 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 - **JWT algorithm:** RS256 (RSA 2048-bit)
 - **Access token expiry:** 24 hours
 - **Refresh token expiry:** 7 days (stored as SHA-256 hash in DB)
+- **Password reset token expiry:** 15 minutes (stored as SHA-256 hash in DB)
 - **Token validation:** Performed at gateway level before requests reach backend services
 - **Refresh flow:** Client sends refresh_token → Auth Service rotates (delete old, issue new pair)
+- **Password reset flow:** Request token via email → validate token → set new password → revoke all refresh tokens
 - **Key rotation:** Replace `private_key.pem`, `public_key.pem`, and `public_key.json` (JWKS format)
 
 ## Environment Variables
@@ -488,6 +507,22 @@ All services use **Zerolog** for structured JSON logs. Every log entry includes:
 2. **Go Runtime** — memory, goroutines, GC activity
 3. **Loki Logs** — centralized log search and filtering
 
+## Frontend (Next.js)
+
+The frontend is a Next.js application located in `front-end/`. It provides:
+
+| Page | Path | Description |
+|------|------|-------------|
+| Login | `/auth/login` | Username/password login via NextAuth.js |
+| Register | `/auth/register` | New user registration |
+| Forgot Password | `/auth/forgot-password` | Request password reset token by email |
+| Reset Password | `/auth/reset-password` | Set new password using reset token (supports `?token=` URL param) |
+| Dashboard | `/dashboard` | Protected page (requires authentication) |
+
+API proxy routes (`app/api/auth/`) forward requests to the backend Auth Service.
+
+> **Dev mode note:** The forgot-password endpoint returns the `reset_token` in the response body. Remove this field when integrating a real email service.
+
 ## Project Structure
 
 ```
@@ -497,7 +532,7 @@ food-delivery/
 │   └── internal/
 │       ├── handler/        # HTTP handlers
 │       ├── middleware/      # Logger
-│       ├── model/           # User model
+│       ├── model/           # User, RefreshToken, PasswordResetToken
 │       ├── repository/      # Database layer
 │       └── service/         # JWT generation, business logic
 ├── order-service/
@@ -530,6 +565,13 @@ food-delivery/
 │       │                    #   KitchenStation, MenuStationMapping
 │       ├── repository/      # Database layer (7 repositories)
 │       └── service/         # Business logic (7 services)
+├── front-end/
+│   ├── app/
+│   │   ├── api/auth/        # API proxy routes (NextAuth, forgot/reset password)
+│   │   ├── auth/            # Auth pages (login, register, forgot/reset password)
+│   │   └── dashboard/       # Protected dashboard page
+│   ├── middleware.ts         # NextAuth middleware
+│   └── package.json
 ├── gateway/
 │   └── plugin/              # Correlation ID injector plugin
 ├── krakend.json             # API Gateway routing & JWT config
@@ -565,6 +607,11 @@ id, username (unique), password (bcrypt), email (unique), role, created_at, upda
 **refresh_tokens** (auth_db)
 ```
 id, user_id (FK→users), token_hash (unique, SHA-256), expires_at, created_at
+```
+
+**password_reset_tokens** (auth_db)
+```
+id, user_id (FK→users), token_hash (unique, SHA-256), expires_at (15 min), created_at
 ```
 
 **roles** (auth_db)
