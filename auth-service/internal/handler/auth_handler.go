@@ -1,73 +1,269 @@
 package handler
 
 import (
-	"auth-service/internal/model"
 	"auth-service/internal/service"
-	"fmt"
-	"strings"
+	"errors"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 )
 
 type AuthHandler struct {
-	svc service.AuthService
+	authService service.AuthService
 }
 
-func NewAuthHandler(svc service.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
-}
-
-// Login godoc
-// @Summary      Login user
-// @Description  Authenticate user and return JWT token
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Param        request body model.LoginRequest true "Login Request"
-// @Success      200  {object}  model.LoginResponse
-// @Failure      400  {object}  map[string]interface{}
-// @Failure      401  {object}  map[string]interface{}
-// @Router       /api/v1/auth/login [post]
-func (h *AuthHandler) Login(c *fiber.Ctx) error {
-	var req model.LoginRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
-	}
-
-	resp, err := h.svc.Login(req)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(resp)
+func NewAuthHandler(authService service.AuthService) *AuthHandler {
+	return &AuthHandler{authService: authService}
 }
 
 // Register godoc
-// @Summary      Register user
-// @Description  Create a new user account
+// @Summary      Register a new user
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        user body model.User true "User Data"
-// @Success      201  {object}  map[string]interface{}
-// @Failure      400  {object}  map[string]interface{}
-// @Failure      500  {object}  map[string]interface{}
+// @Param        request body object{username=string,password=string,email=string} true "Register request"
+// @Success      201  {object}  object{message=string,user=object{id=int,username=string,email=string,role=string}}
+// @Failure      400  {object}  object{error=string}
+// @Failure      409  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
 // @Router       /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
-	var user model.User
-	if err := c.BodyParser(&user); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.Username == "" || req.Password == "" || req.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "username, password and email are required"})
+	}
+	if len(req.Password) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
 	}
 
-	if err := h.svc.Register(&user); err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "SQLSTATE 23505") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Username or email already exists"})
+	user, err := h.authService.Register(req.Username, req.Password, req.Email)
+	if err != nil {
+		if errors.Is(err, service.ErrUserExists) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("register failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
+	log.Info().Str("correlation_id", correlationID).Uint("user_id", user.ID).Msg("user registered")
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "User registered successfully",
-		"user_id": fmt.Sprint(user.ID),
+		"message": "registered successfully",
+		"user": fiber.Map{
+			"id":       user.ID,
+			"username": user.Username,
+			"email":    user.Email,
+			"role":     user.Role,
+		},
 	})
+}
+
+// Login godoc
+// @Summary      Login
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{username=string,password=string} true "Login request"
+// @Success      200  {object}  object{access_token=string,refresh_token=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router       /api/v1/auth/login [post]
+func (h *AuthHandler) Login(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	pair, err := h.authService.Login(req.Username, req.Password)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid username or password"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("login failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Str("username", req.Username).Msg("user logged in")
+	return c.Status(fiber.StatusOK).JSON(pair)
+}
+
+// Refresh godoc
+// @Summary      Refresh access token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{refresh_token=string} true "Refresh request"
+// @Success      200  {object}  object{access_token=string,refresh_token=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router       /api/v1/auth/refresh [post]
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.RefreshToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "refresh_token is required"})
+	}
+
+	pair, err := h.authService.Refresh(req.RefreshToken)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid or expired refresh token"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("refresh failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(pair)
+}
+
+// Logout godoc
+// @Summary      Logout (revoke refresh token)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{refresh_token=string} true "Logout request"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Router       /api/v1/auth/logout [post]
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.RefreshToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "refresh_token is required"})
+	}
+
+	// ไม่ return error ถ้า token ไม่เจอ (idempotent logout)
+	_ = h.authService.Logout(req.RefreshToken)
+
+	log.Info().Str("correlation_id", correlationID).Msg("user logged out")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "logged out successfully"})
+}
+
+// LogoutAll godoc
+// @Summary      Logout from all devices
+// @Tags         auth
+// @Produce      json
+// @Param        X-User-Id header string true "User ID (injected by gateway)"
+// @Success      200  {object}  object{message=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router       /api/v1/auth/logout-all [post]
+func (h *AuthHandler) LogoutAll(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+
+	if err := h.authService.LogoutAll(userID); err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("logout all failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint("user_id", userID).Msg("logged out all devices")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "logged out from all devices"})
+}
+
+// GetProfile godoc
+// @Summary      Get current user profile
+// @Tags         auth
+// @Produce      json
+// @Param        X-User-Id header string true "User ID (injected by gateway)"
+// @Success      200  {object}  object{id=int,username=string,email=string,role=string,created_at=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      404  {object}  object{error=string}
+// @Router       /api/v1/auth/profile [get]
+func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+
+	user, err := h.authService.GetProfile(userID)
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("get profile failed")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"id":         user.ID,
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+	})
+}
+
+// ChangePassword godoc
+// @Summary      Change password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        X-User-Id header string true "User ID (injected by gateway)"
+// @Param        request body object{current_password=string,new_password=string} true "Change password request"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      401  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router       /api/v1/auth/password [put]
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "current_password and new_password are required"})
+	}
+	if len(req.NewPassword) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "new password must be at least 8 characters"})
+	}
+
+	if err := h.authService.ChangePassword(userID, req.CurrentPassword, req.NewPassword); err != nil {
+		if errors.Is(err, service.ErrIncorrectPassword) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "current password is incorrect"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("change password failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint("user_id", userID).Msg("password changed")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "password changed — please login again"})
+}
+
+// ── Helper ───────────────────────────────────────────────────────
+
+func extractUserID(c *fiber.Ctx) (uint, error) {
+	id, err := strconv.ParseUint(c.Get("X-User-Id"), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(id), nil
 }

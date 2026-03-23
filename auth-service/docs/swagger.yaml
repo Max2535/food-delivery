@@ -1,51 +1,8 @@
 basePath: /
-definitions:
-  auth-service_internal_model.LoginRequest:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
-    type: object
-  auth-service_internal_model.LoginResponse:
-    properties:
-      token:
-        type: string
-    type: object
-  auth-service_internal_model.User:
-    properties:
-      createdAt:
-        type: string
-      deletedAt:
-        $ref: '#/definitions/gorm.DeletedAt'
-      email:
-        type: string
-      id:
-        type: integer
-      password:
-        type: string
-      role:
-        type: string
-      updatedAt:
-        type: string
-      username:
-        type: string
-    type: object
-  gorm.DeletedAt:
-    properties:
-      time:
-        type: string
-      valid:
-        description: Valid is true if Time is not NULL
-        type: boolean
-    type: object
 host: localhost:3005
 info:
   contact: {}
-  description: This is the API server for an auth service.
+  description: JWT-based authentication service
   title: Auth Service API
   version: "1.0"
 paths:
@@ -53,65 +10,332 @@ paths:
     post:
       consumes:
       - application/json
-      description: Authenticate user and return JWT token
       parameters:
-      - description: Login Request
+      - description: Login request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth-service_internal_model.LoginRequest'
+          properties:
+            password:
+              type: string
+            username:
+              type: string
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth-service_internal_model.LoginResponse'
+            properties:
+              access_token:
+                type: string
+              refresh_token:
+                type: string
+            type: object
         "400":
           description: Bad Request
           schema:
-            additionalProperties: true
+            properties:
+              error:
+                type: string
             type: object
         "401":
           description: Unauthorized
           schema:
-            additionalProperties: true
+            properties:
+              error:
+                type: string
             type: object
-      summary: Login user
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Logout request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Logout (revoke refresh token)
+      tags:
+      - auth
+  /api/v1/auth/logout-all:
+    post:
+      parameters:
+      - description: User ID (injected by gateway)
+        in: header
+        name: X-User-Id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Logout from all devices
+      tags:
+      - auth
+  /api/v1/auth/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID (injected by gateway)
+        in: header
+        name: X-User-Id
+        required: true
+        type: string
+      - description: Change password request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            current_password:
+              type: string
+            new_password:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Change password
+      tags:
+      - auth
+  /api/v1/auth/profile:
+    get:
+      parameters:
+      - description: User ID (injected by gateway)
+        in: header
+        name: X-User-Id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              created_at:
+                type: string
+              email:
+                type: string
+              id:
+                type: integer
+              role:
+                type: string
+              username:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get current user profile
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              access_token:
+                type: string
+              refresh_token:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Refresh access token
       tags:
       - auth
   /api/v1/auth/register:
     post:
       consumes:
       - application/json
-      description: Create a new user account
       parameters:
-      - description: User Data
+      - description: Register request
         in: body
-        name: user
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/auth-service_internal_model.User'
+          properties:
+            email:
+              type: string
+            password:
+              type: string
+            username:
+              type: string
+          type: object
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            additionalProperties: true
+            properties:
+              message:
+                type: string
+              user:
+                properties:
+                  email:
+                    type: string
+                  id:
+                    type: integer
+                  role:
+                    type: string
+                  username:
+                    type: string
+                type: object
             type: object
         "400":
           description: Bad Request
           schema:
-            additionalProperties: true
+            properties:
+              error:
+                type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            properties:
+              error:
+                type: string
             type: object
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties: true
+            properties:
+              error:
+                type: string
             type: object
-      summary: Register user
+      summary: Register a new user
       tags:
       - auth
 swagger: "2.0"

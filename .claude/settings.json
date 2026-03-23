@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -q 'docker-compose' && echo \"$cmd\" | grep -q -- '--build'; then cd \"d:/go-lang/food-delivery/auth-service\" && go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d . 2>/dev/null || true; fi",
+            "timeout": 120,
+            "statusMessage": "Regenerating Swagger docs for auth-service..."
+          }
+        ]
+      }
+    ]
+  }
+}

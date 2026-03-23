@@ -8,6 +8,8 @@ import (
 type UserRepository interface {
 	Create(user *model.User) error
 	FindByUsername(username string) (*model.User, error)
+	FindByID(id uint) (*model.User, error)
+	UpdatePassword(id uint, hashedPassword string) error
 }
 
 type userRepository struct {
@@ -25,8 +27,17 @@ func (r *userRepository) Create(user *model.User) error {
 func (r *userRepository) FindByUsername(username string) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("username = ?", username).First(&user).Error
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return &user, err
+}
+
+func (r *userRepository) FindByID(id uint) (*model.User, error) {
+	var user model.User
+	err := r.db.First(&user, id).Error
+	return &user, err
+}
+
+func (r *userRepository) UpdatePassword(id uint, hashedPassword string) error {
+	return r.db.Model(&model.User{}).
+		Where("id = ?", id).
+		Update("password", hashedPassword).Error
 }

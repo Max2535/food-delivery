@@ -17,7 +17,6 @@ const docTemplate = `{
     "paths": {
         "/api/v1/auth/login": {
             "post": {
-                "description": "Authenticate user and return JWT token",
                 "consumes": [
                     "application/json"
                 ],
@@ -27,15 +26,23 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Login user",
+                "summary": "Login",
                 "parameters": [
                     {
-                        "description": "Login Request",
+                        "description": "Login request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth-service_internal_model.LoginRequest"
+                            "type": "object",
+                            "properties": {
+                                "password": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 ],
@@ -43,29 +50,55 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/auth-service_internal_model.LoginResponse"
+                            "type": "object",
+                            "properties": {
+                                "access_token": {
+                                    "type": "string"
+                                },
+                                "refresh_token": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/register": {
+        "/api/v1/auth/logout": {
             "post": {
-                "description": "Create a new user account",
                 "consumes": [
                     "application/json"
                 ],
@@ -75,15 +108,367 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register user",
+                "summary": "Logout (revoke refresh token)",
                 "parameters": [
                     {
-                        "description": "User Data",
-                        "name": "user",
+                        "description": "Logout request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth-service_internal_model.User"
+                            "type": "object",
+                            "properties": {
+                                "refresh_token": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout-all": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout from all devices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (injected by gateway)",
+                        "name": "X-User-Id",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/password": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change password",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (injected by gateway)",
+                        "name": "X-User-Id",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Change password request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "current_password": {
+                                    "type": "string"
+                                },
+                                "new_password": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/profile": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get current user profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (injected by gateway)",
+                        "name": "X-User-Id",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "created_at": {
+                                    "type": "string"
+                                },
+                                "email": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "role": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "refresh_token": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "access_token": {
+                                    "type": "string"
+                                },
+                                "refresh_token": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/register": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Register request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "email": {
+                                    "type": "string"
+                                },
+                                "password": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 ],
@@ -92,89 +477,63 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "user": {
+                                    "type": "object",
+                                    "properties": {
+                                        "email": {
+                                            "type": "string"
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "role": {
+                                            "type": "string"
+                                        },
+                                        "username": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
-                }
-            }
-        }
-    },
-    "definitions": {
-        "auth-service_internal_model.LoginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth-service_internal_model.LoginResponse": {
-            "type": "object",
-            "properties": {
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth-service_internal_model.User": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "gorm.DeletedAt": {
-            "type": "object",
-            "properties": {
-                "time": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if Time is not NULL",
-                    "type": "boolean"
                 }
             }
         }
@@ -188,7 +547,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Auth Service API",
-	Description:      "This is the API server for an auth service.",
+	Description:      "JWT-based authentication service",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

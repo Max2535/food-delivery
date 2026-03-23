@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-postgres@latest",
+        "postgresql://admin:admin@localhost:5432/postgres"
+      ]
+    },
+    "docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/var/run/docker.sock:/var/run/docker.sock",
+        "mcp/docker"
+      ]
+    },
+    "redis": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-redis@latest",
+        "redis://localhost:6379"
+      ]
+    },
+    "rabbitmq": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-rabbitmq",
+        "--url",
+        "amqp://guest:guest@localhost:5672/"
+      ]
+    }
+  }
+}

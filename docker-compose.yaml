@@ -121,7 +121,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3002:3000" # เข้าผ่าน Port 3002 (User/Pass: admin/admin)
+      - "3010:3000"
     environment:
       <<: *tz
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -248,7 +248,7 @@ services:
     container_name: auth-service-api
     restart: always
     ports:
-      - "3005:3002"
+      - "3002:3002"
     environment:
       <<: *tz
       PORT: 3002

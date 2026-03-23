@@ -13,17 +13,12 @@ const (
 type User struct {
 	gorm.Model
 	Username string `gorm:"uniqueIndex;not null" json:"username"`
-	Password string `gorm:"not null" json:"password"`
+	Password string `gorm:"not null" json:"-"`
 	Email    string `gorm:"uniqueIndex;not null" json:"email"`
 	Role     string `gorm:"default:user" json:"role"`
 }
 
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResponse struct {
-	Token string `json:"token"`
-	Role  string `json:"role"`
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }

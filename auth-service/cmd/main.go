@@ -6,10 +6,10 @@ import (
 	"auth-service/internal/model"
 	"auth-service/internal/repository"
 	"auth-service/internal/service"
+
+	_ "auth-service/docs"
 	"os"
 	"time"
-
-	_ "auth-service/docs" // Swagger docs
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -22,17 +22,14 @@ import (
 
 // @title Auth Service API
 // @version 1.0
-// @description This is the API server for an auth service.
+// @description JWT-based authentication service
 // @host localhost:3005
 // @BasePath /
-
 func main() {
-	// Load .env
 	if err := godotenv.Load(); err != nil {
 		log.Warn().Msg(".env file not found, using environment variables")
 	}
 
-	// Database Connection
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
 		log.Fatal().Msg("DB_URL is not set")
@@ -40,8 +37,7 @@ func main() {
 
 	var db *gorm.DB
 	var err error
-
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		db, err = gorm.Open(postgres.Open(dbURL), &gorm.Config{})
 		if err == nil {
 			break
@@ -49,14 +45,11 @@ func main() {
 		log.Warn().Err(err).Int("attempt", i+1).Msg("Failed to connect to database")
 		time.Sleep(2 * time.Second)
 	}
-
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	// Auto Migrate
-	err = db.AutoMigrate(&model.User{}, &model.Role{})
-	if err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
 	}
 
@@ -74,23 +67,22 @@ func main() {
 
 	// Initialize Layers
 	userRepo := repository.NewUserRepository(db)
-	authSvc := service.NewAuthService(userRepo)
+	tokenRepo := repository.NewRefreshTokenRepository(db)
+	authSvc := service.NewAuthService(userRepo, tokenRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
-	// Seed test users for TestSprite tests
-	log.Info().Msg("Seeding test users...")
-	testUsers := []model.User{
-		{Username: "admin", Password: "adminpassword", Email: "admin@food-delivery.com", Role: model.RoleAdmin},
-		{Username: "rider_01", Password: "securepassword123", Email: "rider01@food-delivery.com", Role: model.RoleRider},
-		{Username: "customer_01", Password: "password123", Email: "customer@food-delivery.com", Role: model.RoleCustomer},
-		{Username: "validuser", Password: "validpassword", Email: "validuser@example.com", Role: model.RoleUser},
+	// Seed test users
+	testUsers := []struct{ username, password, email string }{
+		{"admin", "adminpassword", "admin@food-delivery.com"},
+		{"rider_01", "securepassword123", "rider01@food-delivery.com"},
+		{"customer_01", "password123", "customer@food-delivery.com"},
+		{"validuser", "validpassword", "validuser@example.com"},
 	}
-
 	for _, u := range testUsers {
-		if err := authSvc.Register(&u); err != nil {
-			log.Warn().Err(err).Str("username", u.Username).Msg("Could not seed user (it may already exist)")
+		if _, err := authSvc.Register(u.username, u.password, u.email); err != nil {
+			log.Warn().Err(err).Str("username", u.username).Msg("Could not seed user (may already exist)")
 		} else {
-			log.Info().Str("username", u.Username).Msg("Seeded user successfully")
+			log.Info().Str("username", u.username).Msg("Seeded user successfully")
 		}
 	}
 
@@ -109,19 +101,19 @@ func main() {
 	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Routes
-	api := app.Group("/api")
-	v1 := api.Group("/v1")
-
-	auth := v1.Group("/auth")
-	auth.Post("/login", authHandler.Login)
+	auth := app.Group("/api/v1/auth")
 	auth.Post("/register", authHandler.Register)
+	auth.Post("/login", authHandler.Login)
+	auth.Post("/refresh", authHandler.Refresh)
+	auth.Post("/logout", authHandler.Logout)
+	auth.Post("/logout-all", authHandler.LogoutAll)
+	auth.Get("/profile", authHandler.GetProfile)
+	auth.Put("/password", authHandler.ChangePassword)
 
-	// Listen
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3002"
 	}
-
 	log.Info().Str("port", port).Msg("Auth Service starting...")
 	log.Fatal().Err(app.Listen(":" + port)).Msg("Server failed")
 }
