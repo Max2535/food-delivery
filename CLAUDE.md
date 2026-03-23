@@ -84,12 +84,23 @@ docker-compose up -d --build inventory-worker
 Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`, `inventory_db`).
 
 ### Authentication Flow
-1. Auth Service issues RS256 JWT signed with `private_key.pem`
+1. Auth Service issues RS256 JWT (access token + refresh token) signed with `private_key.pem`
 2. KrakenD validates all protected requests using `public_key.json` (JWKS)
 3. Extracted claims (`user_id`) forwarded as `X-User-Id` header to backend
 4. Services do NOT validate JWT themselves — trust the gateway
 
-Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`
+**Auth endpoints:**
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/v1/auth/register` | POST | No | Register new user |
+| `/v1/auth/login` | POST | No | Login, returns access_token + refresh_token |
+| `/v1/auth/refresh` | POST | No | Refresh access token using refresh_token |
+| `/v1/auth/logout` | POST | No | Revoke a specific refresh token |
+| `/v1/auth/logout-all` | POST | JWT | Revoke all refresh tokens for user |
+| `/v1/auth/profile` | GET | JWT | Get current user profile |
+| `/v1/auth/password` | PUT | JWT | Change password |
+
+Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`, `/v1/auth/profile`, `/v1/auth/logout-all`, `/v1/auth/password`
 
 ### Inter-Service Communication
 - **Sync (via gateway):** Client → KrakenD → Service
@@ -158,17 +169,30 @@ Order Service wraps Kitchen Service calls with Sony GoBreaker. If adding new cro
 
 Edit `krakend.json`. For a protected endpoint add:
 ```json
-"extra_config": {
-  "auth/validator": {
-    "alg": "RS256",
-    "jwk_local_path": "/etc/krakend/public_key.json",
-    "disable_jwk_security": true,
-    "propagate_claims": [
-      ["user_id", "X-User-Id"]
-    ]
-  }
+{
+  "endpoint": "/v1/your-endpoint",
+  "method": "GET",
+  "output_encoding": "no-op",
+  "input_headers": ["Authorization", "Content-Type", "X-User-Id"],
+  "extra_config": {
+    "auth/validator": {
+      "alg": "RS256",
+      "jwk_local_path": "/etc/krakend/public_key.json",
+      "disable_jwk_security": true,
+      "propagate_claims": [
+        ["user_id", "X-User-Id"]
+      ]
+    }
+  },
+  "backend": [{
+    "url_pattern": "/api/v1/your-endpoint",
+    "host": ["http://your-service:port"],
+    "encoding": "no-op"
+  }]
 }
 ```
+
+**Important (KrakenD 2.13):** Propagated claim headers (e.g. `X-User-Id`) MUST be listed in `input_headers` at the endpoint level, otherwise they will not be forwarded to the backend. Always include `"X-User-Id"` in `input_headers` when using `propagate_claims`.
 
 ## Logging Convention
 
@@ -181,13 +205,20 @@ log.Info().
     Msg("...")
 ```
 
-## Swagger (Order Service Only)
+## Swagger
 
 ```bash
+# Order Service
 cd order-service
 go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d .
 docker-compose up -d --build api
 # View at: http://localhost:3000/swagger/index.html
+
+# Auth Service
+cd auth-service
+go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d .
+docker-compose up -d --build auth-service
+# View at: http://localhost:3002/swagger/index.html
 ```
 
 ## JWT Key Rotation
@@ -241,29 +272,67 @@ CATALOG_SERVICE_URL=http://catalog-service-api:3003
 
 ## Testing
 
-No automated test suite exists yet. Manual testing flow:
+### Unit Tests
+
+Auth Service has unit tests for handler and service layers:
+
+```bash
+cd auth-service
+go test ./internal/... -v
+```
+
+Test coverage: Register, Login, Refresh, Logout, LogoutAll, GetProfile, ChangePassword — both success and error cases (39 tests).
+
+### Manual Testing Flow
 
 ```bash
 # 1. Register
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"test","password":"pass","email":"t@t.com"}'
+  -d '{"username":"test","password":"testpass1","email":"t@t.com"}'
 
-# 2. Login
+# 2. Login (returns access_token + refresh_token)
 TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"test","password":"pass"}' | jq -r .token)
+  -d '{"username":"test","password":"testpass1"}' | jq -r .access_token)
 
-# 3. Create order
+# 3. Get profile (JWT required)
+curl http://localhost:8080/v1/auth/profile \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4. Refresh token
+REFRESH=$(curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test","password":"testpass1"}' | jq -r .refresh_token)
+curl -X POST http://localhost:8080/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\":\"$REFRESH\"}"
+
+# 5. Change password (JWT required)
+curl -X PUT http://localhost:8080/v1/auth/password \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"current_password":"testpass1","new_password":"newpass123"}'
+
+# 6. Logout (revoke one refresh token)
+curl -X POST http://localhost:8080/v1/auth/logout \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\":\"$REFRESH\"}"
+
+# 7. Logout all devices (JWT required)
+curl -X POST http://localhost:8080/v1/auth/logout-all \
+  -H "Authorization: Bearer $TOKEN"
+
+# 8. Create order (JWT required)
 curl -X POST http://localhost:8080/v1/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"customer_id":"c1","total_amount":50.00}'
 
-# 4. Check kitchen ticket
+# 9. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
 
-# 5. Create a catalog menu item
+# 10. Create a catalog menu item (JWT required)
 curl -X POST http://localhost:8080/v1/catalog/menus \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \

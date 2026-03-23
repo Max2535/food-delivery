@@ -52,7 +52,7 @@ Observability:
 | Service | Port | Responsibility |
 |---------|------|----------------|
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
-| Auth Service | 3005 | User registration, login, JWT issuance |
+| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management |
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
@@ -108,6 +108,7 @@ docker-compose ps
 | Redis Insight | http://localhost:8001 | — |
 | pgAdmin | http://localhost:5050 | admin@admin.com / admin |
 | Order Swagger | http://localhost:3000/swagger/index.html | — |
+| Auth Swagger | http://localhost:3002/swagger/index.html | — |
 
 ## API Reference
 
@@ -119,14 +120,48 @@ All requests go through the API Gateway at `http://localhost:8080`.
 ```bash
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username": "john", "password": "secret", "email": "john@example.com"}'
+  -d '{"username": "john", "password": "secret123", "email": "john@example.com"}'
 ```
 
-#### Login
+#### Login (returns access_token + refresh_token)
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "john", "password": "secret"}' | jq -r .token)
+  -d '{"username": "john", "password": "secret123"}' | jq -r .access_token)
+```
+
+#### Refresh Token
+```bash
+curl -X POST http://localhost:8080/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "<refresh_token_from_login>"}'
+```
+
+#### Get Profile (JWT required)
+```bash
+curl http://localhost:8080/v1/auth/profile \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### Change Password (JWT required)
+```bash
+curl -X PUT http://localhost:8080/v1/auth/password \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"current_password": "secret123", "new_password": "newsecret123"}'
+```
+
+#### Logout (revoke one refresh token)
+```bash
+curl -X POST http://localhost:8080/v1/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "<refresh_token>"}'
+```
+
+#### Logout All Devices (JWT required)
+```bash
+curl -X POST http://localhost:8080/v1/auth/logout-all \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Orders (requires JWT)
@@ -373,8 +408,10 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 
 - **Password hashing:** bcrypt (cost 10)
 - **JWT algorithm:** RS256 (RSA 2048-bit)
-- **Token expiry:** 24 hours
+- **Access token expiry:** 24 hours
+- **Refresh token expiry:** 7 days (stored as SHA-256 hash in DB)
 - **Token validation:** Performed at gateway level before requests reach backend services
+- **Refresh flow:** Client sends refresh_token → Auth Service rotates (delete old, issue new pair)
 - **Key rotation:** Replace `private_key.pem`, `public_key.pem`, and `public_key.json` (JWKS format)
 
 ## Environment Variables
@@ -522,7 +559,17 @@ Tables are auto-migrated by GORM on service startup.
 
 **users** (auth_db)
 ```
-id, username (unique), password (bcrypt), email (unique), created_at, updated_at
+id, username (unique), password (bcrypt), email (unique), role, created_at, updated_at, deleted_at
+```
+
+**refresh_tokens** (auth_db)
+```
+id, user_id (FK→users), token_hash (unique, SHA-256), expires_at, created_at
+```
+
+**roles** (auth_db)
+```
+id, name (unique), created_at, updated_at
 ```
 
 **orders** (order_db)
@@ -593,11 +640,23 @@ id, raw_material_id, quantity_change (decimal 12,3), type (RESTOCK|DEDUCTION|ADJ
 
 ## Development
 
-### Regenerate Swagger Docs (Order Service)
+### Regenerate Swagger Docs
 ```bash
+# Order Service
 cd order-service
 go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d .
 docker-compose up -d --build api
+
+# Auth Service
+cd auth-service
+go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/main.go -d .
+docker-compose up -d --build auth-service
+```
+
+### Run Unit Tests
+```bash
+# Auth Service (39 tests — handler + service layers)
+cd auth-service && go test ./internal/... -v
 ```
 
 ### Rebuild a Single Service
