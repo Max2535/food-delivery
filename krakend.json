@@ -565,6 +565,7 @@
       "endpoint": "/v1/auth/logout-all",
       "method": "POST",
       "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "X-User-Id"],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -587,6 +588,7 @@
       "endpoint": "/v1/auth/profile",
       "method": "GET",
       "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "X-User-Id"],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -609,6 +611,7 @@
       "endpoint": "/v1/auth/password",
       "method": "PUT",
       "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "X-User-Id"],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
