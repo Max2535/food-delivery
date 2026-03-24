@@ -66,3 +66,19 @@ func (m *MockAuthService) ResetPassword(token, newPassword string) error {
 	args := m.Called(token, newPassword)
 	return args.Error(0)
 }
+
+func (m *MockAuthService) ListGroups() ([]*model.Group, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*model.Group), args.Error(1)
+}
+
+func (m *MockAuthService) ListRoles() ([]*model.Role, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*model.Role), args.Error(1)
+}

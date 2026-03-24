@@ -11,26 +11,21 @@ interface GroupUser {
   email: string;
 }
 
+interface Role {
+  ID: number;
+  name: string;
+}
+
 interface Group {
   id: string;
   name: string;
   description: string;
   is_active: boolean;
-  roles: string[];
+  role_ids: number[];
   users: GroupUser[];
   created_at: string;
   updated_at: string;
 }
-
-const AVAILABLE_ROLES = [
-  "admin",
-  "manager",
-  "chef",
-  "cashier",
-  "delivery",
-  "inventory",
-  "viewer",
-];
 
 // ─── Mock Data ───────────────────────────────────────────────────
 const INITIAL_GROUPS: Group[] = [
@@ -39,7 +34,7 @@ const INITIAL_GROUPS: Group[] = [
     name: "ผู้ดูแลระบบ",
     description: "กลุ่มผู้ดูแลระบบทั้งหมด",
     is_active: true,
-    roles: ["admin", "manager"],
+    role_ids: [1],
     users: [
       { id: "u1", username: "admin1", email: "admin1@food.com" },
       { id: "u2", username: "admin2", email: "admin2@food.com" },
@@ -52,7 +47,7 @@ const INITIAL_GROUPS: Group[] = [
     name: "พนักงานครัว",
     description: "กลุ่มพนักงานประจำครัว",
     is_active: true,
-    roles: ["chef", "viewer"],
+    role_ids: [5],
     users: [
       { id: "u3", username: "chef1", email: "chef1@food.com" },
       { id: "u4", username: "chef2", email: "chef2@food.com" },
@@ -66,7 +61,7 @@ const INITIAL_GROUPS: Group[] = [
     name: "พนักงานส่งอาหาร",
     description: "กลุ่มพนักงานจัดส่ง",
     is_active: false,
-    roles: ["delivery"],
+    role_ids: [2],
     users: [{ id: "u6", username: "rider1", email: "rider1@food.com" }],
     created_at: "2026-03-10T00:00:00Z",
     updated_at: "2026-03-15T00:00:00Z",
@@ -78,6 +73,8 @@ export default function GroupsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
@@ -87,7 +84,7 @@ export default function GroupsPage() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formRoles, setFormRoles] = useState<string[]>([]);
+  const [formRoleIds, setFormRoleIds] = useState<number[]>([]);
 
   // Detail / user management
   const [detailGroup, setDetailGroup] = useState<Group | null>(null);
@@ -97,11 +94,53 @@ export default function GroupsPage() {
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // ─── Helper: resolve role ID → name ─────────────────────────
+  function roleName(id: number): string {
+    return availableRoles.find((r) => r.ID === id)?.name ?? `role#${id}`;
+  }
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/auth/login");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const accessToken = (session as any)?.accessToken;
+    if (status !== "authenticated" || !accessToken) return;
+
+    const controller = new AbortController();
+
+    async function fetchRoles() {
+      try {
+        const res = await fetch("/api/auth/roles", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          console.error("ไม่สามารถโหลด roles ได้", res.status);
+          return;
+        }
+
+        const json = await res.json();
+        const roles: Role[] = Array.isArray(json) ? json : json.roles;
+        if (Array.isArray(roles)) {
+          setAvailableRoles(roles);
+        }
+      } catch (error) {
+        if ((error as any).name !== "AbortError") {
+          console.error("fetch roles error", error);
+        }
+      }
+    }
+
+    fetchRoles();
+
+    return () => controller.abort();
+  }, [status, session]);
 
   if (status === "loading") {
     return (
@@ -131,7 +170,7 @@ export default function GroupsPage() {
     setEditingGroup(null);
     setFormName("");
     setFormDescription("");
-    setFormRoles([]);
+    setFormRoleIds([]);
     setShowModal(true);
   }
 
@@ -139,7 +178,7 @@ export default function GroupsPage() {
     setEditingGroup(group);
     setFormName(group.name);
     setFormDescription(group.description);
-    setFormRoles([...group.roles]);
+    setFormRoleIds([...group.role_ids]);
     setShowModal(true);
   }
 
@@ -148,7 +187,6 @@ export default function GroupsPage() {
     if (!formName.trim()) return;
 
     if (editingGroup) {
-      // Update
       setGroups((prev) =>
         prev.map((g) =>
           g.id === editingGroup.id
@@ -156,20 +194,19 @@ export default function GroupsPage() {
                 ...g,
                 name: formName.trim(),
                 description: formDescription.trim(),
-                roles: formRoles,
+                role_ids: formRoleIds,
                 updated_at: new Date().toISOString(),
               }
             : g
         )
       );
     } else {
-      // Create
       const newGroup: Group = {
         id: crypto.randomUUID(),
         name: formName.trim(),
         description: formDescription.trim(),
         is_active: true,
-        roles: formRoles,
+        role_ids: formRoleIds,
         users: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -201,10 +238,10 @@ export default function GroupsPage() {
     }
   }
 
-  // ─── Role toggle ────────────────────────────────────────────
-  function toggleRole(role: string) {
-    setFormRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+  // ─── Role toggle (modal) ───────────────────────────────────
+  function toggleFormRole(roleId: number) {
+    setFormRoleIds((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
     );
   }
 
@@ -253,33 +290,33 @@ export default function GroupsPage() {
   }
 
   // ─── Inline role management for detail view ─────────────────
-  function addRoleToGroup(role: string) {
+  function addRoleToGroup(roleId: number) {
     if (!detailGroup) return;
     setGroups((prev) =>
       prev.map((g) =>
-        g.id === detailGroup.id && !g.roles.includes(role)
-          ? { ...g, roles: [...g.roles, role], updated_at: new Date().toISOString() }
+        g.id === detailGroup.id && !g.role_ids.includes(roleId)
+          ? { ...g, role_ids: [...g.role_ids, roleId], updated_at: new Date().toISOString() }
           : g
       )
     );
     setDetailGroup((prev) =>
-      prev && !prev.roles.includes(role)
-        ? { ...prev, roles: [...prev.roles, role] }
+      prev && !prev.role_ids.includes(roleId)
+        ? { ...prev, role_ids: [...prev.role_ids, roleId] }
         : prev
     );
   }
 
-  function removeRoleFromGroup(role: string) {
+  function removeRoleFromGroup(roleId: number) {
     if (!detailGroup) return;
     setGroups((prev) =>
       prev.map((g) =>
         g.id === detailGroup.id
-          ? { ...g, roles: g.roles.filter((r) => r !== role), updated_at: new Date().toISOString() }
+          ? { ...g, role_ids: g.role_ids.filter((id) => id !== roleId), updated_at: new Date().toISOString() }
           : g
       )
     );
     setDetailGroup((prev) =>
-      prev ? { ...prev, roles: prev.roles.filter((r) => r !== role) } : prev
+      prev ? { ...prev, role_ids: prev.role_ids.filter((id) => id !== roleId) } : prev
     );
   }
 
@@ -367,17 +404,17 @@ export default function GroupsPage() {
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
                         <span>{group.users.length} สมาชิก</span>
-                        <span>{group.roles.length} สิทธิ์</span>
+                        <span>{group.role_ids.length} สิทธิ์</span>
                       </div>
                       {/* Roles badges */}
-                      {group.roles.length > 0 && (
+                      {group.role_ids.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {group.roles.map((role) => (
+                          {group.role_ids.map((id) => (
                             <span
-                              key={role}
+                              key={id}
                               className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded"
                             >
-                              {role}
+                              {roleName(id)}
                             </span>
                           ))}
                         </div>
@@ -439,27 +476,27 @@ export default function GroupsPage() {
                   สิทธิ์ (Roles)
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {detailGroup.roles.map((role) => (
+                  {detailGroup.role_ids.map((id) => (
                     <span
-                      key={role}
+                      key={id}
                       className="inline-flex items-center gap-1 text-sm bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full"
                     >
-                      {role}
+                      {roleName(id)}
                       <button
-                        onClick={() => removeRoleFromGroup(role)}
+                        onClick={() => removeRoleFromGroup(id)}
                         className="text-blue-500 hover:text-red-500 ml-0.5"
                       >
                         ×
                       </button>
                     </span>
                   ))}
-                  {detailGroup.roles.length === 0 && (
+                  {detailGroup.role_ids.length === 0 && (
                     <span className="text-sm text-gray-400">ไม่มีสิทธิ์</span>
                   )}
                 </div>
                 {/* Add role dropdown */}
-                {AVAILABLE_ROLES.filter(
-                  (r) => !detailGroup.roles.includes(r)
+                {availableRoles.filter(
+                  (r) => !detailGroup.role_ids.includes(r.ID)
                 ).length > 0 && (
                   <div className="flex items-center gap-2">
                     <select
@@ -468,7 +505,7 @@ export default function GroupsPage() {
                       defaultValue=""
                       onChange={(e) => {
                         if (e.target.value) {
-                          addRoleToGroup(e.target.value);
+                          addRoleToGroup(Number(e.target.value));
                           e.target.value = "";
                         }
                       }}
@@ -476,13 +513,13 @@ export default function GroupsPage() {
                       <option value="" disabled>
                         + เพิ่มสิทธิ์...
                       </option>
-                      {AVAILABLE_ROLES.filter(
-                        (r) => !detailGroup.roles.includes(r)
-                      ).map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
+                      {availableRoles
+                        .filter((r) => !detailGroup.role_ids.includes(r.ID))
+                        .map((role) => (
+                          <option key={role.ID} value={role.ID}>
+                            {role.name}
+                          </option>
+                        ))}
                     </select>
                   </div>
                 )}
@@ -591,18 +628,18 @@ export default function GroupsPage() {
                   สิทธิ์ (Roles)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {AVAILABLE_ROLES.map((role) => (
+                  {availableRoles.map((role) => (
                     <button
-                      key={role}
+                      key={role.ID}
                       type="button"
-                      onClick={() => toggleRole(role)}
+                      onClick={() => toggleFormRole(role.ID)}
                       className={`text-sm px-3 py-1 rounded-full border transition ${
-                        formRoles.includes(role)
+                        formRoleIds.includes(role.ID)
                           ? "bg-blue-600 text-white border-blue-600"
                           : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
                       }`}
                     >
-                      {role}
+                      {role.name}
                     </button>
                   ))}
                 </div>

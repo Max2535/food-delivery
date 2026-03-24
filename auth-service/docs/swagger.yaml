@@ -6,6 +6,79 @@ info:
   title: Auth Service API
   version: "1.0"
 paths:
+  /api/v1/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Forgot password request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            email:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Request password reset
+      tags:
+      - auth
+  /api/v1/auth/groups:
+    get:
+      description: Get all user groups with role mappings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              groups:
+                items:
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    roles:
+                      items:
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: List groups
+      tags:
+      - auth
   /api/v1/auth/login:
     post:
       consumes:
@@ -336,6 +409,56 @@ paths:
                 type: string
             type: object
       summary: Register a new user
+      tags:
+      - auth
+  /api/v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Reset password request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            new_password:
+              type: string
+            token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Reset password with token
       tags:
       - auth
 swagger: "2.0"

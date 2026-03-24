@@ -149,6 +149,8 @@ func main() {
 	auth.Put("/password", authHandler.ChangePassword)
 	auth.Post("/forgot-password", authHandler.ForgotPassword)
 	auth.Post("/reset-password", authHandler.ResetPassword)
+	auth.Get("/groups", authHandler.ListGroups)
+	auth.Get("/roles", authHandler.ListRoles)
 
 	port := os.Getenv("PORT")
 	if port == "" {

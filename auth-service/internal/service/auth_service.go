@@ -33,6 +33,8 @@ type AuthService interface {
 	ChangePassword(userID uint, currentPassword, newPassword string) error
 	ForgotPassword(email string) (string, error)
 	ResetPassword(token, newPassword string) error
+	ListGroups() ([]*model.Group, error)
+	ListRoles() ([]*model.Role, error)
 }
 
 type authService struct {
@@ -175,6 +177,14 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 	_ = s.tokenRepo.DeleteByUserID(rt.UserID)
 
 	return nil
+}
+
+func (s *authService) ListGroups() ([]*model.Group, error) {
+	return s.groupRepo.ListAll()
+}
+
+func (s *authService) ListRoles() ([]*model.Role, error) {
+	return s.groupRepo.ListRoles()
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

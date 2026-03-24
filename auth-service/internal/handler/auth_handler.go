@@ -342,6 +342,74 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "password has been reset — please login with your new password"})
 }
 
+// ListGroups godoc
+// @Summary List groups
+// @Description Get all user groups with role mappings
+// @Tags auth
+// @Produce json
+// @Success      200  {object}  object{groups=[]object{id=int,name=string,roles=[]object{id=int,name=string}}}
+// @Failure      500  {object}  object{error=string}
+// @Router /api/v1/auth/groups [get]
+func (h *AuthHandler) ListGroups(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	groups, err := h.authService.ListGroups()
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("list groups failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	type roleResp struct {
+		ID   uint   `json:"ID"`
+		Name string `json:"name"`
+	}
+	type groupResp struct {
+		ID    uint       `json:"ID"`
+		Name  string     `json:"name"`
+		Roles []roleResp `json:"roles"`
+	}
+
+	result := make([]groupResp, len(groups))
+	for i, g := range groups {
+		roles := make([]roleResp, len(g.Roles))
+		for j, r := range g.Roles {
+			roles[j] = roleResp{ID: r.ID, Name: r.Name}
+		}
+		result[i] = groupResp{ID: g.ID, Name: g.Name, Roles: roles}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"groups": result})
+}
+
+// ListRoles godoc
+// @Summary List roles
+// @Description Get all available roles
+// @Tags auth
+// @Produce json
+// @Success      200  {object}  object{roles=[]object{id=int,name=string}}
+// @Failure      500  {object}  object{error=string}
+// @Router /api/v1/auth/roles [get]
+func (h *AuthHandler) ListRoles(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	roles, err := h.authService.ListRoles()
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("list roles failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	type roleResp struct {
+		ID   uint   `json:"ID"`
+		Name string `json:"name"`
+	}
+	result := make([]roleResp, len(roles))
+	for i, r := range roles {
+		result[i] = roleResp{ID: r.ID, Name: r.Name}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"roles": result})
+}
+
 // ── Helper ───────────────────────────────────────────────────────
 
 func extractUserID(c *fiber.Ctx) (uint, error) {
