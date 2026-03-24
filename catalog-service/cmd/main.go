@@ -12,10 +12,12 @@ import (
 	"catalog-service/internal/model"
 	"catalog-service/internal/repository"
 	"catalog-service/internal/service"
+	"catalog-service/internal/telemetry"
 	_ "catalog-service/docs" // Swagger docs
 	swagger "github.com/gofiber/swagger"
 
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -32,6 +34,13 @@ import (
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
 		log.Warn().Msg("Warning: .env file not found")
+	}
+
+	// OpenTelemetry
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint != "" {
+		shutdown := telemetry.InitTracer("catalog-service", otelEndpoint)
+		defer shutdown(context.Background())
 	}
 
 	dbURL := os.Getenv("DB_URL")
@@ -237,6 +246,7 @@ func main() {
 
 	app := fiber.New()
 
+	app.Use(otelfiber.Middleware())
 	app.Use(middleware.LoggerMiddleware())
 
 	prome := fiberprometheus.NewWithDefaultRegistry("catalog-service")

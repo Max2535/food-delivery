@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -12,8 +13,10 @@ import (
 	"order-service/internal/model"
 	"order-service/internal/repository"
 	"order-service/internal/service"
+	"order-service/internal/telemetry"
 
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	swagger "github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
@@ -31,6 +34,13 @@ func main() {
 	// Load .env
 	if err := godotenv.Load(".env"); err != nil {
 		log.Warn().Msg("Warning: .env file not found")
+	}
+
+	// OpenTelemetry
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint != "" {
+		shutdown := telemetry.InitTracer("order-service", otelEndpoint)
+		defer shutdown(context.Background())
 	}
 
 	// Database Connection
@@ -68,6 +78,7 @@ func main() {
 	app := fiber.New()
 
 	// Global Middleware
+	app.Use(otelfiber.Middleware())
 	app.Use(middleware.LoggerMiddleware())
 
 	// 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ

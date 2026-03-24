@@ -1,23 +1,26 @@
 package main
 
 import (
-    "kitchen-service/internal/handler"
+	"context"
+	"kitchen-service/internal/handler"
 	"kitchen-service/internal/middleware"
 	"kitchen-service/internal/model"
-    "kitchen-service/internal/repository"
-    "kitchen-service/internal/service"
-    "kitchen-service/internal/worker"
-    _ "kitchen-service/docs" // Swagger docs
-    swagger "github.com/gofiber/swagger"
+	"kitchen-service/internal/repository"
+	"kitchen-service/internal/service"
+	"kitchen-service/internal/telemetry"
+	"kitchen-service/internal/worker"
+	_ "kitchen-service/docs" // Swagger docs
+	"os"
 
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
+	swagger "github.com/gofiber/swagger"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"os"
 )
 
 // @title Kitchen Service API
@@ -29,6 +32,13 @@ import (
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
 		log.Warn().Msg("Warning: .env file not found")
+	}
+
+	// OpenTelemetry
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint != "" {
+		shutdown := telemetry.InitTracer("kitchen-service", otelEndpoint)
+		defer shutdown(context.Background())
 	}
 
 	// 1. Database Connection (Kitchen DB)
@@ -50,6 +60,7 @@ func main() {
     app := fiber.New()
 
 	// Global Middleware
+	app.Use(otelfiber.Middleware())
 	app.Use(middleware.LoggerMiddleware())
 
     // 1. ใช้ Middleware แบบ NewWithDefaultRegistry เพื่อรวบรวม Go Runtime Metrics อัตโนมัติ

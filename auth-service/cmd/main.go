@@ -6,12 +6,15 @@ import (
 	"auth-service/internal/model"
 	"auth-service/internal/repository"
 	"auth-service/internal/service"
+	"auth-service/internal/telemetry"
+	"context"
 
 	_ "auth-service/docs"
 	"os"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	swagger "github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
@@ -28,6 +31,13 @@ import (
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Warn().Msg(".env file not found, using environment variables")
+	}
+
+	// OpenTelemetry
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint != "" {
+		shutdown := telemetry.InitTracer("auth-service", otelEndpoint)
+		defer shutdown(context.Background())
 	}
 
 	dbURL := os.Getenv("DB_URL")
@@ -91,6 +101,7 @@ func main() {
 	app := fiber.New()
 
 	// Global Middleware
+	app.Use(otelfiber.Middleware())
 	app.Use(middleware.LoggerMiddleware())
 
 	// 1. Prometheus Middleware - ใช้เป้าหมายเดียวกับ order-service

@@ -38,6 +38,7 @@ Each service is a standalone Go module with its own `go.mod`.
 - **KrakenD** — API gateway with JWT RS256 validation
 - **Consul** — service discovery (Kitchen registers; Order can discover)
 - **Prometheus + Grafana + Loki + Promtail** — observability
+- **Jaeger** — distributed tracing (OpenTelemetry / OTLP gRPC)
 - **Zerolog** — structured JSON logging
 - **Sony GoBreaker** — circuit breaker in Order Service
 - **golang-jwt/jwt/v5** — JWT generation (Auth Service)
@@ -78,6 +79,8 @@ docker-compose up -d --build inventory-worker
 | Prometheus | 9090 | 9090 |
 | Grafana | 3000 | 3002 |
 | Loki | 3100 | 3100 |
+| Jaeger UI | 16686 | 16686 |
+| Jaeger OTLP gRPC | 4317 | 4317 |
 
 ## Key Architectural Decisions
 
@@ -359,4 +362,5 @@ curl -X POST http://localhost:8080/v1/catalog/menus \
 - RabbitMQ: http://localhost:15672 (guest/guest)
 - Consul: http://localhost:8500
 - Redis Insight: http://localhost:8085
+- Jaeger: http://localhost:16686
 - pgAdmin: http://localhost:5551 (admin@admin.com/admin)

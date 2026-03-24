@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -12,10 +13,12 @@ import (
 	"inventory-service/internal/model"
 	"inventory-service/internal/repository"
 	"inventory-service/internal/service"
+	"inventory-service/internal/telemetry"
 	_ "inventory-service/docs" // Swagger docs
 	swagger "github.com/gofiber/swagger"
 
 	fiberprometheus "github.com/ansrivas/fiberprometheus/v2"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -31,6 +34,13 @@ import (
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
 		log.Warn().Msg("Warning: .env file not found")
+	}
+
+	// OpenTelemetry
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint != "" {
+		shutdown := telemetry.InitTracer("inventory-service", otelEndpoint)
+		defer shutdown(context.Background())
 	}
 
 	dbURL := os.Getenv("DB_URL")
@@ -120,6 +130,7 @@ func main() {
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
 
 	app := fiber.New()
+	app.Use(otelfiber.Middleware())
 	app.Use(middleware.LoggerMiddleware())
 
 	prome := fiberprometheus.NewWithDefaultRegistry("inventory-service")

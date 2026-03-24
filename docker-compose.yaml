@@ -35,6 +35,7 @@ services:
       DB_URL: postgres://admin:admin@db:5432/order_db?sslmode=disable
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       CONSUL_ADDRESS: consul:8500
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +57,7 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       CONSUL_ADDRESS: consul:8500
       SERVICE_ADDRESS: kitchen-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
       db:
         condition: service_healthy
@@ -163,6 +165,7 @@ services:
       - DB_URL=postgres://admin:admin@db:5432/inventory_db?sslmode=disable
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - CATALOG_SERVICE_URL=http://catalog-service-api:3003
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     depends_on:
       - db
       - rabbitmq
@@ -194,6 +197,7 @@ services:
       PORT: 3003
       DB_URL: postgres://admin:admin@db:5432/catalog_db?sslmode=disable
       REDIS_URL: redis:6379
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
       db:
         condition: service_healthy
@@ -254,6 +258,7 @@ services:
       PORT: 3002
       DB_URL: postgres://admin:admin@db:5432/auth_db?sslmode=disable
       PRIVATE_KEY_PATH: /app/private_key.pem
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     volumes:
       - ./private_key.pem:/app/private_key.pem
     depends_on:
@@ -285,6 +290,15 @@ services:
       <<: *tz
     ports:
       - "8787:80"
+
+  jaeger:
+    image: jaegertracing/all-in-one
+    container_name: jaeger
+    environment:
+      <<: *tz
+    ports:
+      - "16686:16686"
+      - "4317:4317"
 
 volumes:
   postgres_data:
