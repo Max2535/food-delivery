@@ -110,7 +110,7 @@ func main() {
 
 	// Seed test users
 	testUsers := []struct{ username, password, email string }{
-		{"admin", "adminpassword", "admin@food-delivery.com"},
+		{"admin", "admin", "admin@food-delivery.com"},
 		{"rider_01", "securepassword123", "rider01@food-delivery.com"},
 		{"customer_01", "password123", "customer@food-delivery.com"},
 		{"validuser", "validpassword", "validuser@example.com"},
@@ -150,6 +150,8 @@ func main() {
 	auth.Post("/forgot-password", authHandler.ForgotPassword)
 	auth.Post("/reset-password", authHandler.ResetPassword)
 	auth.Get("/groups", authHandler.ListGroups)
+	auth.Post("/group", authHandler.CreateGroup)
+	auth.Put("/group", authHandler.UpdateGroup)
 	auth.Get("/roles", authHandler.ListRoles)
 
 	port := os.Getenv("PORT")

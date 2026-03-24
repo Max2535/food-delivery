@@ -21,6 +21,8 @@ var (
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrIncorrectPassword  = errors.New("current password is incorrect")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrGroupExists        = errors.New("group name already exists")
+	ErrGroupNotFound      = errors.New("group not found")
 )
 
 type AuthService interface {
@@ -35,6 +37,8 @@ type AuthService interface {
 	ResetPassword(token, newPassword string) error
 	ListGroups() ([]*model.Group, error)
 	ListRoles() ([]*model.Role, error)
+	CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
+	UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
 }
 
 type authService struct {
@@ -185,6 +189,78 @@ func (s *authService) ListGroups() ([]*model.Group, error) {
 
 func (s *authService) ListRoles() ([]*model.Role, error) {
 	return s.groupRepo.ListRoles()
+}
+
+func (s *authService) CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error) {
+	roles, err := s.groupRepo.FindRolesByIDs(roleIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	group := &model.Group{
+		Name:        name,
+		Description: description,
+		IsActive:    isActive,
+		Roles:       roles,
+	}
+
+	if err := s.groupRepo.Create(group); err != nil {
+		if isDuplicateError(err) {
+			return nil, ErrGroupExists
+		}
+		return nil, err
+	}
+
+	// Assign existing users to this group
+	if len(userIDs) > 0 {
+		if err := s.userRepo.UpdateGroupID(userIDs, group.ID); err != nil {
+			return nil, err
+		}
+		users, err := s.userRepo.FindByIDs(userIDs)
+		if err != nil {
+			return nil, err
+		}
+		group.Users = users
+	}
+
+	return group, nil
+}
+
+func (s *authService) UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error) {
+	group, err := s.groupRepo.FindByID(id)
+	if err != nil {
+		return nil, ErrGroupNotFound
+	}
+
+	roles, err := s.groupRepo.FindRolesByIDs(roleIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	group.Name = name
+	group.Description = description
+	group.IsActive = isActive
+	group.Roles = roles
+
+	if err := s.groupRepo.Update(group); err != nil {
+		if isDuplicateError(err) {
+			return nil, ErrGroupExists
+		}
+		return nil, err
+	}
+
+	if len(userIDs) > 0 {
+		if err := s.userRepo.UpdateGroupID(userIDs, group.ID); err != nil {
+			return nil, err
+		}
+		users, err := s.userRepo.FindByIDs(userIDs)
+		if err != nil {
+			return nil, err
+		}
+		group.Users = users
+	}
+
+	return group, nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

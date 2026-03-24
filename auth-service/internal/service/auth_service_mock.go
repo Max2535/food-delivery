@@ -82,3 +82,27 @@ func (m *MockAuthService) ListRoles() ([]*model.Role, error) {
 	}
 	return args.Get(0).([]*model.Role), args.Error(1)
 }
+
+func (m *MockAuthService) CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error) {
+	args := m.Called(name, description, isActive, roleIDs, userIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Group), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error) {
+	args := m.Called(id, name, description, isActive, roleIDs, userIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Group), args.Error(1)
+}
+
+func (m *MockAuthService) GetGroupByID(groupID uint) (*model.Group, error) {
+	args := m.Called(groupID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Group), args.Error(1)
+}

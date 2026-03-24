@@ -1,6 +1,6 @@
 import { auth } from "@/app/auth-config";
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   if (!req.auth && req.nextUrl.pathname.startsWith("/dashboard")) {
     const loginUrl = new URL("/auth/login", req.nextUrl.origin);
     return Response.redirect(loginUrl);

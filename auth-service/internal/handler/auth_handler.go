@@ -347,7 +347,7 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 // @Description Get all user groups with role mappings
 // @Tags auth
 // @Produce json
-// @Success      200  {object}  object{groups=[]object{id=int,name=string,roles=[]object{id=int,name=string}}}
+// @Success      200  {object}  object{groups=[]object{id=int,name=string,description=string,is_active=bool,roles=[]object{id=int,name=string},users=[]object{id=int,username=string,email=string}}}
 // @Failure      500  {object}  object{error=string}
 // @Router /api/v1/auth/groups [get]
 func (h *AuthHandler) ListGroups(c *fiber.Ctx) error {
@@ -363,10 +363,18 @@ func (h *AuthHandler) ListGroups(c *fiber.Ctx) error {
 		ID   uint   `json:"ID"`
 		Name string `json:"name"`
 	}
+	type userResp struct {
+		ID       uint   `json:"ID"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	}
 	type groupResp struct {
-		ID    uint       `json:"ID"`
-		Name  string     `json:"name"`
-		Roles []roleResp `json:"roles"`
+		ID          uint       `json:"ID"`
+		Name        string     `json:"name"`
+		Description string     `json:"description"`
+		IsActive    bool       `json:"is_active"`
+		Roles       []roleResp `json:"roles"`
+		Users       []userResp `json:"users"`
 	}
 
 	result := make([]groupResp, len(groups))
@@ -375,7 +383,11 @@ func (h *AuthHandler) ListGroups(c *fiber.Ctx) error {
 		for j, r := range g.Roles {
 			roles[j] = roleResp{ID: r.ID, Name: r.Name}
 		}
-		result[i] = groupResp{ID: g.ID, Name: g.Name, Roles: roles}
+		users := make([]userResp, len(g.Users))
+		for j, u := range g.Users {
+			users[j] = userResp{ID: u.ID, Username: u.Username, Email: u.Email}
+		}
+		result[i] = groupResp{ID: g.ID, Name: g.Name, Description: g.Description, IsActive: g.IsActive, Roles: roles, Users: users}
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"groups": result})
@@ -408,6 +420,186 @@ func (h *AuthHandler) ListRoles(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"roles": result})
+}
+
+// CreateGroup godoc
+// @Summary Create group
+// @Description Create a new user group with roles and optional user assignments
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object{name=string,description=string,is_active=bool,role_ids=[]int,user_ids=[]int} true "Group data"
+// @Success      201  {object}  object{group=object{id=int,name=string,description=string,is_active=bool,roles=[]object{id=int,name=string},users=[]object{id=int,username=string,email=string}}}
+// @Failure      400  {object}  object{error=string}
+// @Failure      409  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router /api/v1/auth/groups [post]
+func (h *AuthHandler) CreateGroup(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		IsActive    *bool  `json:"is_active"`
+		RoleIDs     []uint `json:"role_ids"`
+		Users       []struct {
+			ID uint `json:"id"`
+		} `json:"users"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	userIDs := make([]uint, len(req.Users))
+	for i, u := range req.Users {
+		userIDs[i] = u.ID
+	}
+
+	group, err := h.authService.CreateGroup(req.Name, req.Description, isActive, req.RoleIDs, userIDs)
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("create group failed")
+		if err == service.ErrGroupExists {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	type roleResp struct {
+		ID   uint   `json:"ID"`
+		Name string `json:"name"`
+	}
+	type userResp struct {
+		ID       uint   `json:"ID"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	}
+	type groupResp struct {
+		ID          uint       `json:"ID"`
+		Name        string     `json:"name"`
+		Description string     `json:"description"`
+		IsActive    bool       `json:"is_active"`
+		Roles       []roleResp `json:"roles"`
+		Users       []userResp `json:"users"`
+	}
+
+	roles := make([]roleResp, len(group.Roles))
+	for i, r := range group.Roles {
+		roles[i] = roleResp{ID: r.ID, Name: r.Name}
+	}
+	users := make([]userResp, len(group.Users))
+	for i, u := range group.Users {
+		users[i] = userResp{ID: u.ID, Username: u.Username, Email: u.Email}
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint("group_id", group.ID).Msg("group created")
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"group": groupResp{
+			ID:          group.ID,
+			Name:        group.Name,
+			Description: group.Description,
+			IsActive:    group.IsActive,
+			Roles:       roles,
+			Users:       users,
+		},
+	})
+}
+
+// UpdateGroup godoc
+// @Summary Update group
+// @Description Update an existing user group (name, description, active status, roles, user assignments)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object{id=int,name=string,description=string,is_active=bool,role_ids=[]int,user_ids=[]int} true "Group data"
+// @Success      200  {object}  object{group=object{id=int,name=string,description=string,is_active=bool,roles=[]object{id=int,name=string},users=[]object{id=int,username=string,email=string}}}
+// @Failure      400  {object}  object{error=string}
+// @Failure      404  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router /api/v1/auth/group [put]
+func (h *AuthHandler) UpdateGroup(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	var req struct {
+		ID          uint   `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		IsActive    *bool  `json:"is_active"`
+		RoleIDs     []uint `json:"role_ids"`
+		Users       []struct {
+			ID uint `json:"id"`
+		} `json:"users"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.ID == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "group ID is required"})
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	userIDs := make([]uint, len(req.Users))
+	for i, u := range req.Users {
+		userIDs[i] = u.ID
+	}
+
+	group, err := h.authService.UpdateGroup(req.ID, req.Name, req.Description, isActive, req.RoleIDs, userIDs)
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("update group failed")
+		if err == service.ErrGroupNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	type roleResp struct {
+		ID   uint   `json:"ID"`
+		Name string `json:"name"`
+	}
+	type userResp struct {
+		ID       uint   `json:"ID"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	}
+	type groupResp struct {
+		ID          uint       `json:"ID"`
+		Name        string     `json:"name"`
+		Description string     `json:"description"`
+		IsActive    bool       `json:"is_active"`
+		Roles       []roleResp `json:"roles"`
+		Users       []userResp `json:"users"`
+	}
+	roles := make([]roleResp, len(group.Roles))
+	for i, r := range group.Roles {
+		roles[i] = roleResp{ID: r.ID, Name: r.Name}
+	}
+	users := make([]userResp, len(group.Users))
+	for i, u := range group.Users {
+		users[i] = userResp{ID: u.ID, Username: u.Username, Email: u.Email}
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint("group_id", group.ID).Msg("group updated")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"group": groupResp{
+			ID:          group.ID,
+			Name:        group.Name,
+			Description: group.Description,
+			IsActive:    group.IsActive,
+			Roles:       roles,
+			Users:       users,
+		},
+	})
 }
 
 // ── Helper ───────────────────────────────────────────────────────

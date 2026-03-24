@@ -27,47 +27,6 @@ interface Group {
   updated_at: string;
 }
 
-// ─── Mock Data ───────────────────────────────────────────────────
-const INITIAL_GROUPS: Group[] = [
-  {
-    id: "1",
-    name: "ผู้ดูแลระบบ",
-    description: "กลุ่มผู้ดูแลระบบทั้งหมด",
-    is_active: true,
-    role_ids: [1],
-    users: [
-      { id: "u1", username: "admin1", email: "admin1@food.com" },
-      { id: "u2", username: "admin2", email: "admin2@food.com" },
-    ],
-    created_at: "2026-03-01T00:00:00Z",
-    updated_at: "2026-03-20T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "พนักงานครัว",
-    description: "กลุ่มพนักงานประจำครัว",
-    is_active: true,
-    role_ids: [5],
-    users: [
-      { id: "u3", username: "chef1", email: "chef1@food.com" },
-      { id: "u4", username: "chef2", email: "chef2@food.com" },
-      { id: "u5", username: "chef3", email: "chef3@food.com" },
-    ],
-    created_at: "2026-03-05T00:00:00Z",
-    updated_at: "2026-03-18T00:00:00Z",
-  },
-  {
-    id: "3",
-    name: "พนักงานส่งอาหาร",
-    description: "กลุ่มพนักงานจัดส่ง",
-    is_active: false,
-    role_ids: [2],
-    users: [{ id: "u6", username: "rider1", email: "rider1@food.com" }],
-    created_at: "2026-03-10T00:00:00Z",
-    updated_at: "2026-03-15T00:00:00Z",
-  },
-];
-
 // ─── Component ───────────────────────────────────────────────────
 export default function GroupsPage() {
   const { data: session, status } = useSession();
@@ -75,7 +34,7 @@ export default function GroupsPage() {
 
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
 
@@ -94,6 +53,9 @@ export default function GroupsPage() {
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Save loading state
+  const [saving, setSaving] = useState(false);
+
   // ─── Helper: resolve role ID → name ─────────────────────────
   function roleName(id: number): string {
     return availableRoles.find((r) => r.ID === id)?.name ?? `role#${id}`;
@@ -110,7 +72,7 @@ export default function GroupsPage() {
     if (status !== "authenticated" || !accessToken) return;
 
     const controller = new AbortController();
-
+    //get roles for form options and display
     async function fetchRoles() {
       try {
         const res = await fetch("/api/auth/roles", {
@@ -139,6 +101,49 @@ export default function GroupsPage() {
 
     fetchRoles();
 
+    //get groups (with users and roles) for display and management
+    async function fetchUserGroup() {
+      try {
+        const res = await fetch("/api/auth/groups", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          console.error("ไม่สามารถโหลด groups ได้", res.status);
+          return;
+        }
+
+        const json = await res.json();
+        const raw: any[] = Array.isArray(json) ? json : json.groups;
+        if (Array.isArray(raw)) {
+          const groups: Group[] = raw.map((g) => ({
+            id: String(g.ID ?? g.id),
+            name: g.name,
+            description: g.description ?? "",
+            is_active: g.is_active,
+            role_ids: (g.roles ?? []).map((r: any) => r.ID),
+            users: (g.users ?? []).map((u: any) => ({
+              id: String(u.ID ?? u.id),
+              username: u.username,
+              email: u.email,
+            })),
+            created_at: g.created_at ?? "",
+            updated_at: g.updated_at ?? "",
+          }));
+          setGroups(groups);
+        }
+      } catch (error) {
+        if ((error as any).name !== "AbortError") {
+          console.error("fetch groups error", error);
+        }
+      }
+    }
+
+    fetchUserGroup();
+
     return () => controller.abort();
   }, [status, session]);
 
@@ -160,8 +165,8 @@ export default function GroupsPage() {
       filterStatus === "all"
         ? true
         : filterStatus === "active"
-        ? g.is_active
-        : !g.is_active;
+          ? g.is_active
+          : !g.is_active;
     return matchSearch && matchStatus;
   });
 
@@ -182,36 +187,120 @@ export default function GroupsPage() {
     setShowModal(true);
   }
 
-  function handleSave(e: FormEvent) {
+  async function handleSave(e: FormEvent) {
     e.preventDefault();
-    if (!formName.trim()) return;
+    if (!formName.trim() || saving) return;
+
+    const accessToken = (session as any)?.accessToken;
+    if (!accessToken) return;
 
     if (editingGroup) {
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === editingGroup.id
-            ? {
-                ...g,
-                name: formName.trim(),
-                description: formDescription.trim(),
-                role_ids: formRoleIds,
-                updated_at: new Date().toISOString(),
+      setSaving(true);
+      try {
+        const res = await fetch("/api/auth/groups", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            id: Number(editingGroup.id),
+            name: formName.trim(),
+            description: formDescription.trim(),
+            is_active: editingGroup.is_active,
+            role_ids: formRoleIds,
+            users: (editingGroup.users ?? []).map((u: any) => ({
+              id: Number(u.ID ?? u.id),
+            }))
+            , // Assuming backend can handle user IDs for group membership
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          console.error("แก้ไขกลุ่มไม่สำเร็จ", res.status, err);
+          alert("แก้ไขกลุ่มไม่สำเร็จ: " + (err?.message ?? res.statusText));
+          return;
+        }
+
+        const json = await res.json();
+        const g = json.group ?? json;
+        const editedId = String(g.ID ?? g.id);
+
+        setGroups((prev) =>
+          prev.map((existing) =>
+            existing.id === editedId
+              ? {
+                ...existing,
+                name: g.name,
+                description: g.description ?? "",
+                is_active: g.is_active,
+                role_ids: (g.roles ?? []).map((r: any) => r.ID ?? r.id),
+                users: (g.users ?? []).map((u: any) => ({
+                  id: String(u.ID ?? u.id),
+                  username: u.username,
+                  email: u.email,
+                })),
+                updated_at: g.updated_at ?? new Date().toISOString(),
               }
-            : g
-        )
-      );
+              : existing
+          )
+        );
+      } catch (err) {
+        console.error("แก้ไขกลุ่มไม่สำเร็จ", err);
+        alert("เกิดข้อผิดพลาดในการแก้ไขกลุ่ม");
+        return;
+      } finally {
+        setSaving(false);
+      }
     } else {
-      const newGroup: Group = {
-        id: crypto.randomUUID(),
-        name: formName.trim(),
-        description: formDescription.trim(),
-        is_active: true,
-        role_ids: formRoleIds,
-        users: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setGroups((prev) => [...prev, newGroup]);
+      setSaving(true);
+      try {
+        const res = await fetch("/api/auth/groups", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            name: formName.trim(),
+            description: formDescription.trim(),
+            is_active: true,
+            role_ids: formRoleIds,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          console.error("สร้างกลุ่มไม่สำเร็จ", res.status, err);
+          alert("สร้างกลุ่มไม่สำเร็จ: " + (err?.message ?? res.statusText));
+          return;
+        }
+
+        const json = await res.json();
+        const g = json.group ?? json;
+        const newGroup: Group = {
+          id: String(g.ID ?? g.id),
+          name: g.name,
+          description: g.description ?? "",
+          is_active: g.is_active,
+          role_ids: (g.roles ?? []).map((r: any) => r.ID ?? r.id),
+          users: (g.users ?? []).map((u: any) => ({
+            id: String(u.ID ?? u.id),
+            username: u.username,
+            email: u.email,
+          })),
+          created_at: g.created_at ?? "",
+          updated_at: g.updated_at ?? "",
+        };
+        setGroups((prev) => [...prev, newGroup]);
+      } catch (err) {
+        console.error("สร้างกลุ่มไม่สำเร็จ", err);
+        alert("เกิดข้อผิดพลาดในการสร้างกลุ่ม");
+        return;
+      } finally {
+        setSaving(false);
+      }
     }
     setShowModal(false);
   }
@@ -277,10 +366,10 @@ export default function GroupsPage() {
       prev.map((g) =>
         g.id === detailGroup.id
           ? {
-              ...g,
-              users: g.users.filter((u) => u.id !== userId),
-              updated_at: new Date().toISOString(),
-            }
+            ...g,
+            users: g.users.filter((u) => u.id !== userId),
+            updated_at: new Date().toISOString(),
+          }
           : g
       )
     );
@@ -370,11 +459,9 @@ export default function GroupsPage() {
               {filtered.map((group) => (
                 <div
                   key={group.id}
-                  className={`bg-white rounded-lg shadow p-4 border-l-4 ${
-                    group.is_active ? "border-green-500" : "border-gray-300"
-                  } ${
-                    detailGroup?.id === group.id ? "ring-2 ring-blue-400" : ""
-                  }`}
+                  className={`bg-white rounded-lg shadow p-4 border-l-4 ${group.is_active ? "border-green-500" : "border-gray-300"
+                    } ${detailGroup?.id === group.id ? "ring-2 ring-blue-400" : ""
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div
@@ -390,11 +477,10 @@ export default function GroupsPage() {
                           {group.name}
                         </h3>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            group.is_active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${group.is_active
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                            }`}
                         >
                           {group.is_active ? "Active" : "Inactive"}
                         </span>
@@ -426,11 +512,10 @@ export default function GroupsPage() {
                       <button
                         onClick={() => toggleActive(group.id)}
                         title={group.is_active ? "Deactivate" : "Activate"}
-                        className={`p-1.5 rounded text-xs font-medium transition ${
-                          group.is_active
-                            ? "text-yellow-600 hover:bg-yellow-50"
-                            : "text-green-600 hover:bg-green-50"
-                        }`}
+                        className={`p-1.5 rounded text-xs font-medium transition ${group.is_active
+                          ? "text-yellow-600 hover:bg-yellow-50"
+                          : "text-green-600 hover:bg-green-50"
+                          }`}
                       >
                         {group.is_active ? "ปิด" : "เปิด"}
                       </button>
@@ -498,31 +583,31 @@ export default function GroupsPage() {
                 {availableRoles.filter(
                   (r) => !detailGroup.role_ids.includes(r.ID)
                 ).length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      id="add-role-select"
-                      className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addRoleToGroup(Number(e.target.value));
-                          e.target.value = "";
-                        }
-                      }}
-                    >
-                      <option value="" disabled>
-                        + เพิ่มสิทธิ์...
-                      </option>
-                      {availableRoles
-                        .filter((r) => !detailGroup.role_ids.includes(r.ID))
-                        .map((role) => (
-                          <option key={role.ID} value={role.ID}>
-                            {role.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
+                    <div className="flex items-center gap-2">
+                      <select
+                        id="add-role-select"
+                        className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addRoleToGroup(Number(e.target.value));
+                            e.target.value = "";
+                          }
+                        }}
+                      >
+                        <option value="" disabled>
+                          + เพิ่มสิทธิ์...
+                        </option>
+                        {availableRoles
+                          .filter((r) => !detailGroup.role_ids.includes(r.ID))
+                          .map((role) => (
+                            <option key={role.ID} value={role.ID}>
+                              {role.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
               </div>
 
               {/* Users section */}
@@ -633,11 +718,10 @@ export default function GroupsPage() {
                       key={role.ID}
                       type="button"
                       onClick={() => toggleFormRole(role.ID)}
-                      className={`text-sm px-3 py-1 rounded-full border transition ${
-                        formRoleIds.includes(role.ID)
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                      }`}
+                      className={`text-sm px-3 py-1 rounded-full border transition ${formRoleIds.includes(role.ID)
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                        }`}
                     >
                       {role.name}
                     </button>

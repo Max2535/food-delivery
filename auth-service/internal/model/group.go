@@ -12,8 +12,11 @@ const (
 
 type Group struct {
 	gorm.Model
-	Name  string `gorm:"uniqueIndex;not null" json:"name"`
-	Roles []Role `gorm:"many2many:group_roles;" json:"roles"`
+	Name        string `gorm:"uniqueIndex;not null" json:"name"`
+	Description string `json:"description"`
+	IsActive    bool   `gorm:"default:true" json:"is_active"`
+	Roles       []Role `gorm:"many2many:group_roles;" json:"roles"`
+	Users       []User `gorm:"foreignKey:GroupID" json:"users,omitempty"`
 }
 
 func (g Group) RoleNames() []string {

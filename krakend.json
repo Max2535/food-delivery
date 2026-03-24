@@ -991,6 +991,70 @@
       ]
     },
     {
+      "endpoint": "/v1/auth/group",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [
+            [
+              "user_id",
+              "X-User-Id"
+            ]
+          ]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/auth/group",
+          "host": [
+            "http://auth-service-api:3002"
+          ],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
+      "endpoint": "/v1/auth/group",
+      "method": "PUT",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [
+            [
+              "user_id",
+              "X-User-Id"
+            ]
+          ]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/auth/group",
+          "host": [
+            "http://auth-service-api:3002"
+          ],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
       "endpoint": "/v1/auth/password",
       "method": "PUT",
       "output_encoding": "no-op",
