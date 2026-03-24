@@ -87,11 +87,35 @@ docker-compose up -d --build inventory-worker
 ### Each Service Has Its Own Database
 Never share a database between services. Each service owns its schema and connects to its own DB (`order_db`, `kitchen_db`, `auth_db`, `catalog_db`, `inventory_db`).
 
-### Authentication Flow
+### Authentication & Authorization Flow
 1. Auth Service issues RS256 JWT (access token + refresh token) signed with `private_key.pem`
 2. KrakenD validates all protected requests using `public_key.json` (JWKS)
 3. Extracted claims (`user_id`) forwarded as `X-User-Id` header to backend
 4. Services do NOT validate JWT themselves — trust the gateway
+
+**Group-based role model:** Users belong to a Group, and each Group has multiple Roles (many-to-many via `group_roles` join table). JWT claims include both `group` (string) and `roles` (string array).
+
+```
+User (group_id FK) → Group ←many2many→ Role
+```
+
+**Seeded groups:**
+| Group | Roles |
+|-------|-------|
+| user | user |
+| customer | customer, user |
+| rider | rider, user |
+| merchant | merchant, user |
+| admin | admin, merchant, rider, customer, user |
+
+New users registered via `/v1/auth/register` are assigned to the `user` group by default.
+
+**JWT claims example:**
+```json
+{"user_id": 1, "username": "alice", "group": "admin", "roles": ["admin","merchant","rider","customer","user"], "exp": ...}
+```
+
+**API response (register/profile)** returns `group` (string) and `roles` (string array) instead of a single `role` field.
 
 **Auth endpoints:**
 | Endpoint | Method | Auth | Description |

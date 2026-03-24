@@ -15,17 +15,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository, *repository.MockRoleRepository) {
+func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository, *repository.MockGroupRepository) {
 	userRepo := new(repository.MockUserRepository)
 	tokenRepo := new(repository.MockRefreshTokenRepository)
-	roleRepo := new(repository.MockRoleRepository)
-	return NewAuthService(userRepo, tokenRepo, roleRepo), userRepo, tokenRepo, roleRepo
+	groupRepo := new(repository.MockGroupRepository)
+	return NewAuthService(userRepo, tokenRepo, groupRepo), userRepo, tokenRepo, groupRepo
 }
 
-func userRole() model.Role {
-	r := model.Role{Name: model.RoleUser}
-	r.ID = 1
-	return r
+func userGroup() model.Group {
+	g := model.Group{
+		Name: model.GroupUser,
+		Roles: []model.Role{
+			{Name: model.RoleUser},
+		},
+	}
+	g.ID = 1
+	g.Roles[0].ID = 1
+	return g
 }
 
 func hashRaw(raw string) string {
@@ -36,28 +42,29 @@ func hashRaw(raw string) string {
 // ── Register ─────────────────────────────────────────────────────────────────
 
 func TestAuthService_Register_Success(t *testing.T) {
-	svc, userRepo, _, roleRepo := newSvc()
+	svc, userRepo, _, groupRepo := newSvc()
 
-	role := userRole()
-	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
+	group := userGroup()
+	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
 	userRepo.On("Create", mock.MatchedBy(func(u *model.User) bool {
-		return u.Username == "alice" && u.Email == "alice@example.com" && u.RoleID == role.ID
+		return u.Username == "alice" && u.Email == "alice@example.com" && u.GroupID == group.ID
 	})).Return(nil).Once()
 
 	user, err := svc.Register("alice", "password123", "alice@example.com")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "alice", user.Username)
-	assert.Equal(t, model.RoleUser, user.Role.Name)
+	assert.Equal(t, model.GroupUser, user.Group.Name)
+	assert.Equal(t, []string{model.RoleUser}, user.Group.RoleNames())
 	userRepo.AssertExpectations(t)
-	roleRepo.AssertExpectations(t)
+	groupRepo.AssertExpectations(t)
 }
 
 func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
-	svc, userRepo, _, roleRepo := newSvc()
+	svc, userRepo, _, groupRepo := newSvc()
 
-	role := userRole()
-	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
+	group := userGroup()
+	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
 
 	var captured *model.User
 	userRepo.On("Create", mock.MatchedBy(func(u *model.User) bool {
@@ -72,10 +79,10 @@ func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
 }
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
-	svc, userRepo, _, roleRepo := newSvc()
+	svc, userRepo, _, groupRepo := newSvc()
 
-	role := userRole()
-	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
+	group := userGroup()
+	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
 	userRepo.On("Create", mock.Anything).Return(errors.New("duplicate key")).Once()
 
 	_, err := svc.Register("alice", "password123", "alice@example.com")
@@ -91,8 +98,8 @@ func TestAuthService_Login_Success(t *testing.T) {
 	svc, userRepo, tokenRepo, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.DefaultCost)
-	role := userRole()
-	user := &model.User{Username: "alice", Password: string(hashed), RoleID: role.ID, Role: role}
+	group := userGroup()
+	user := &model.User{Username: "alice", Password: string(hashed), GroupID: group.ID, Group: group}
 	user.ID = 1
 
 	userRepo.On("FindByUsername", "alice").Return(user, nil).Once()
@@ -141,8 +148,8 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 
 	rawToken := "validrawtoken123"
 	hash := hashRaw(rawToken)
-	role := userRole()
-	user := model.User{Username: "alice", RoleID: role.ID, Role: role}
+	group := userGroup()
+	user := model.User{Username: "alice", GroupID: group.ID, Group: group}
 	user.ID = 1
 
 	rt := &model.RefreshToken{
@@ -182,7 +189,7 @@ func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
 	hash := hashRaw(rawToken)
 	rt := &model.RefreshToken{
 		TokenHash: hash,
-		ExpiresAt: time.Now().Add(-1 * time.Hour), // already expired
+		ExpiresAt: time.Now().Add(-1 * time.Hour),
 	}
 	tokenRepo.On("FindByTokenHash", hash).Return(rt, nil).Once()
 

@@ -15,8 +15,8 @@ type User struct {
 	Username string `gorm:"uniqueIndex;not null" json:"username"`
 	Password string `gorm:"not null" json:"-"`
 	Email    string `gorm:"uniqueIndex;not null" json:"email"`
-	RoleID   uint   `gorm:"not null" json:"role_id"`
-	Role     Role   `gorm:"foreignKey:RoleID" json:"role"`
+	GroupID  uint   `gorm:"not null" json:"group_id"`
+	Group    Group  `gorm:"foreignKey:GroupID" json:"group"`
 }
 
 type TokenPair struct {

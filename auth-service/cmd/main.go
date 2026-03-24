@@ -59,18 +59,43 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
+	if err := db.AutoMigrate(&model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
 	}
 
 	// Seed Roles
-	roles := []string{model.RoleAdmin, model.RoleRider, model.RoleCustomer, model.RoleUser, model.RoleMerchant}
-	for _, roleName := range roles {
+	roleMap := make(map[string]model.Role)
+	for _, roleName := range []string{model.RoleAdmin, model.RoleRider, model.RoleCustomer, model.RoleUser, model.RoleMerchant} {
 		var role model.Role
 		if err := db.Where("name = ?", roleName).First(&role).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				db.Create(&model.Role{Name: roleName})
+				role = model.Role{Name: roleName}
+				db.Create(&role)
 				log.Info().Str("role", roleName).Msg("Seeded role successfully")
+			}
+		}
+		roleMap[roleName] = role
+	}
+
+	// Seed Groups (each group maps to a set of roles)
+	groupRoles := map[string][]string{
+		model.GroupUser:     {model.RoleUser},
+		model.GroupCustomer: {model.RoleCustomer, model.RoleUser},
+		model.GroupRider:    {model.RoleRider, model.RoleUser},
+		model.GroupMerchant: {model.RoleMerchant, model.RoleUser},
+		model.GroupAdmin:    {model.RoleAdmin, model.RoleMerchant, model.RoleRider, model.RoleCustomer, model.RoleUser},
+	}
+	for groupName, roleNames := range groupRoles {
+		var group model.Group
+		if err := db.Where("name = ?", groupName).First(&group).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				roles := make([]model.Role, len(roleNames))
+				for i, rn := range roleNames {
+					roles[i] = roleMap[rn]
+				}
+				group = model.Group{Name: groupName, Roles: roles}
+				db.Create(&group)
+				log.Info().Str("group", groupName).Int("roles", len(roles)).Msg("Seeded group successfully")
 			}
 		}
 	}
@@ -79,8 +104,8 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	resetTokenRepo := repository.NewPasswordResetTokenRepository(db)
-	roleRepo := repository.NewRoleRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, roleRepo)
+	groupRepo := repository.NewGroupRepository(db)
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, groupRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users

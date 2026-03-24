@@ -39,7 +39,7 @@ type authService struct {
 	userRepo       repository.UserRepository
 	tokenRepo      repository.RefreshTokenRepository
 	resetTokenRepo repository.PasswordResetTokenRepository
-	roleRepo       repository.RoleRepository
+	groupRepo      repository.GroupRepository
 }
 
 func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, opts ...any) AuthService {
@@ -48,8 +48,8 @@ func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.Ref
 		switch v := opt.(type) {
 		case repository.PasswordResetTokenRepository:
 			s.resetTokenRepo = v
-		case repository.RoleRepository:
-			s.roleRepo = v
+		case repository.GroupRepository:
+			s.groupRepo = v
 		}
 	}
 	return s
@@ -61,7 +61,7 @@ func (s *authService) Register(username, password, email string) (*model.User, e
 		return nil, err
 	}
 
-	role, err := s.roleRepo.FindByName(model.RoleUser)
+	group, err := s.groupRepo.FindByName(model.GroupUser)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +70,8 @@ func (s *authService) Register(username, password, email string) (*model.User, e
 		Username: username,
 		Password: string(hashed),
 		Email:    email,
-		RoleID:   role.ID,
-		Role:     *role,
+		GroupID:  group.ID,
+		Group:    *group,
 	}
 	if err := s.userRepo.Create(user); err != nil {
 		if isDuplicateError(err) {
@@ -212,10 +212,15 @@ func (s *authService) generateAccessToken(user *model.User) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	roleNames := make([]string, len(user.Group.Roles))
+	for i, r := range user.Group.Roles {
+		roleNames[i] = r.Name
+	}
 	claims := jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
-		"roles":    []string{user.Role.Name},
+		"group":    user.Group.Name,
+		"roles":    roleNames,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

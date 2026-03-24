@@ -52,7 +52,7 @@ Observability:
 | Service | Port | Responsibility |
 |---------|------|----------------|
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
-| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset |
+| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset, group-based roles |
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
@@ -121,6 +121,7 @@ All requests go through the API Gateway at `http://localhost:8080`.
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username": "john", "password": "secret123", "email": "john@example.com"}'
+# Response: {"message":"registered successfully","user":{"id":1,"username":"john","email":"john@example.com","group":"user","roles":["user"]}}
 ```
 
 #### Login (returns access_token + refresh_token)
@@ -432,6 +433,7 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 - **Refresh flow:** Client sends refresh_token → Auth Service rotates (delete old, issue new pair)
 - **Password reset flow:** Request token via email → validate token → set new password → revoke all refresh tokens
 - **Key rotation:** Replace `private_key.pem`, `public_key.pem`, and `public_key.json` (JWKS format)
+- **Authorization model:** Group-based roles — each user belongs to a Group, each Group has multiple Roles (many-to-many). New registrations default to the `user` group. JWT claims include `group` (string) and `roles` (string array).
 
 ## Environment Variables
 
@@ -532,7 +534,7 @@ food-delivery/
 │   └── internal/
 │       ├── handler/        # HTTP handlers
 │       ├── middleware/      # Logger
-│       ├── model/           # User, RefreshToken, PasswordResetToken
+│       ├── model/           # User, Group, Role, RefreshToken, PasswordResetToken
 │       ├── repository/      # Database layer
 │       └── service/         # JWT generation, business logic
 ├── order-service/
@@ -601,8 +603,32 @@ Tables are auto-migrated by GORM on service startup.
 
 **users** (auth_db)
 ```
-id, username (unique), password (bcrypt), email (unique), role, created_at, updated_at, deleted_at
+id, username (unique), password (bcrypt), email (unique), group_id (FK→groups), created_at, updated_at, deleted_at
 ```
+
+**groups** (auth_db)
+```
+id, name (unique), created_at, updated_at, deleted_at
+```
+
+**roles** (auth_db)
+```
+id, name (unique), created_at, updated_at, deleted_at
+```
+
+**group_roles** (auth_db) — join table (many-to-many)
+```
+group_id (FK→groups), role_id (FK→roles)
+```
+
+**Seeded groups:**
+| Group | Roles |
+|-------|-------|
+| user | user |
+| customer | customer, user |
+| rider | rider, user |
+| merchant | merchant, user |
+| admin | admin, merchant, rider, customer, user |
 
 **refresh_tokens** (auth_db)
 ```
@@ -612,11 +638,6 @@ id, user_id (FK→users), token_hash (unique, SHA-256), expires_at, created_at
 **password_reset_tokens** (auth_db)
 ```
 id, user_id (FK→users), token_hash (unique, SHA-256), expires_at (15 min), created_at
-```
-
-**roles** (auth_db)
-```
-id, name (unique), created_at, updated_at
 ```
 
 **orders** (order_db)
