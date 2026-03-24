@@ -33,65 +33,68 @@ func main() {
 
 	// AutoMigrate the schema
 	log.Println("Migrating database...")
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	if err := db.AutoMigrate(&model.Role{}, &model.User{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Ensure roles exist
+	roleMap := make(map[string]uint)
+	for _, name := range []string{model.RoleAdmin, model.RoleRider, model.RoleCustomer, model.RoleUser, model.RoleMerchant} {
+		var role model.Role
+		if err := db.Where("name = ?", name).First(&role).Error; err != nil {
+			role = model.Role{Name: name}
+			db.Create(&role)
+		}
+		roleMap[name] = role.ID
+	}
+
 	// Mock Data
-	users := []model.User{
-		{
-			Username: "admin",
-			Password: "password",
-			Email:    "admin@example.com",
-			Role:     model.RoleAdmin,
-		},
-		{
-			Username: "rider_01",
-			Password: "securepassword123",
-			Email:    "rider01@example.com",
-			Role:     model.RoleRider,
-		},
-		{
-			Username: "user",
-			Password: "password",
-			Email:    "user@example.com",
-			Role:     model.RoleUser,
-		},
-		{
-			Username: "validuser",
-			Password: "validpassword",
-			Email:    "validuser@example.com",
-			Role:     model.RoleUser,
-		},
+	type seedUser struct {
+		Username string
+		Password string
+		Email    string
+		RoleName string
+	}
+	users := []seedUser{
+		{"admin", "password", "admin@example.com", model.RoleAdmin},
+		{"rider_01", "securepassword123", "rider01@example.com", model.RoleRider},
+		{"user", "password", "user@example.com", model.RoleUser},
+		{"validuser", "validpassword", "validuser@example.com", model.RoleUser},
 	}
 
 	log.Println("Seeding data...")
 
-	for _, user := range users {
+	for _, u := range users {
 		// Hash password before saving
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		if err != nil {
-			log.Printf("Failed to hash password for user %s: %v", user.Username, err)
+			log.Printf("Failed to hash password for user %s: %v", u.Username, err)
 			continue
 		}
-		user.Password = string(hashedPassword)
+
+		user := model.User{
+			Username: u.Username,
+			Password: string(hashedPassword),
+			Email:    u.Email,
+			RoleID:   roleMap[u.RoleName],
+		}
 
 		// Check if user already exists
 		var existingUser model.User
-		if err := db.Where("username = ?", user.Username).First(&existingUser).Error; err == nil {
+		if err := db.Where("username = ?", u.Username).First(&existingUser).Error; err == nil {
 			// Update existing user
 			user.ID = existingUser.ID
 			if err := db.Save(&user).Error; err != nil {
-				log.Printf("Failed to update user %s: %v", user.Username, err)
+				log.Printf("Failed to update user %s: %v", u.Username, err)
 			} else {
-				log.Printf("Updated user %s", user.Username)
+				log.Printf("Updated user %s", u.Username)
 			}
 		} else {
 			// Create new user
 			if err := db.Create(&user).Error; err != nil {
-				log.Printf("Failed to seed user %s: %v", user.Username, err)
+				log.Printf("Failed to seed user %s: %v", u.Username, err)
 			} else {
-				log.Printf("Seeded user %s", user.Username)
+				log.Printf("Seeded user %s", u.Username)
 			}
 		}
 	}

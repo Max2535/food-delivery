@@ -46,7 +46,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	app.Post("/register", NewAuthHandler(mockSvc).Register)
 
 	mockSvc.On("Register", "alice", "password123", "alice@example.com").
-		Return(&model.User{Username: "alice", Email: "alice@example.com", Role: "user"}, nil)
+		Return(&model.User{Username: "alice", Email: "alice@example.com", RoleID: 1, Role: model.Role{Name: "user"}}, nil)
 
 	resp, _ := app.Test(newReq("POST", "/register", jsonBody(map[string]string{
 		"username": "alice", "password": "password123", "email": "alice@example.com",
@@ -249,7 +249,7 @@ func TestAuthHandler_GetProfile_Success(t *testing.T) {
 	app := setupApp()
 	app.Get("/profile", NewAuthHandler(mockSvc).GetProfile)
 
-	user := &model.User{Username: "alice", Email: "alice@example.com", Role: "user"}
+	user := &model.User{Username: "alice", Email: "alice@example.com", RoleID: 1, Role: model.Role{Name: "user"}}
 	mockSvc.On("GetProfile", uint(1)).Return(user, nil)
 
 	req := newReq("GET", "/profile", nil)

@@ -39,12 +39,18 @@ type authService struct {
 	userRepo       repository.UserRepository
 	tokenRepo      repository.RefreshTokenRepository
 	resetTokenRepo repository.PasswordResetTokenRepository
+	roleRepo       repository.RoleRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, resetTokenRepo ...repository.PasswordResetTokenRepository) AuthService {
+func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, opts ...any) AuthService {
 	s := &authService{userRepo: userRepo, tokenRepo: tokenRepo}
-	if len(resetTokenRepo) > 0 {
-		s.resetTokenRepo = resetTokenRepo[0]
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case repository.PasswordResetTokenRepository:
+			s.resetTokenRepo = v
+		case repository.RoleRepository:
+			s.roleRepo = v
+		}
 	}
 	return s
 }
@@ -54,11 +60,18 @@ func (s *authService) Register(username, password, email string) (*model.User, e
 	if err != nil {
 		return nil, err
 	}
+
+	role, err := s.roleRepo.FindByName(model.RoleUser)
+	if err != nil {
+		return nil, err
+	}
+
 	user := &model.User{
 		Username: username,
 		Password: string(hashed),
 		Email:    email,
-		Role:     model.RoleUser,
+		RoleID:   role.ID,
+		Role:     *role,
 	}
 	if err := s.userRepo.Create(user); err != nil {
 		if isDuplicateError(err) {
@@ -202,7 +215,7 @@ func (s *authService) generateAccessToken(user *model.User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
-		"roles":    []string{user.Role},
+		"roles":    []string{user.Role.Name},
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

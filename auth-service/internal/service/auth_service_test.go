@@ -15,10 +15,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository) {
+func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository, *repository.MockRoleRepository) {
 	userRepo := new(repository.MockUserRepository)
 	tokenRepo := new(repository.MockRefreshTokenRepository)
-	return NewAuthService(userRepo, tokenRepo), userRepo, tokenRepo
+	roleRepo := new(repository.MockRoleRepository)
+	return NewAuthService(userRepo, tokenRepo, roleRepo), userRepo, tokenRepo, roleRepo
+}
+
+func userRole() model.Role {
+	r := model.Role{Name: model.RoleUser}
+	r.ID = 1
+	return r
 }
 
 func hashRaw(raw string) string {
@@ -29,22 +36,28 @@ func hashRaw(raw string) string {
 // ── Register ─────────────────────────────────────────────────────────────────
 
 func TestAuthService_Register_Success(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, roleRepo := newSvc()
 
+	role := userRole()
+	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
 	userRepo.On("Create", mock.MatchedBy(func(u *model.User) bool {
-		return u.Username == "alice" && u.Email == "alice@example.com" && u.Role == model.RoleUser
+		return u.Username == "alice" && u.Email == "alice@example.com" && u.RoleID == role.ID
 	})).Return(nil).Once()
 
 	user, err := svc.Register("alice", "password123", "alice@example.com")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "alice", user.Username)
-	assert.Equal(t, model.RoleUser, user.Role)
+	assert.Equal(t, model.RoleUser, user.Role.Name)
 	userRepo.AssertExpectations(t)
+	roleRepo.AssertExpectations(t)
 }
 
 func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, roleRepo := newSvc()
+
+	role := userRole()
+	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
 
 	var captured *model.User
 	userRepo.On("Create", mock.MatchedBy(func(u *model.User) bool {
@@ -59,8 +72,10 @@ func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
 }
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, roleRepo := newSvc()
 
+	role := userRole()
+	roleRepo.On("FindByName", model.RoleUser).Return(&role, nil).Once()
 	userRepo.On("Create", mock.Anything).Return(errors.New("duplicate key")).Once()
 
 	_, err := svc.Register("alice", "password123", "alice@example.com")
@@ -73,10 +88,11 @@ func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 
 func TestAuthService_Login_Success(t *testing.T) {
 	os.Setenv("PRIVATE_KEY_PATH", "../../../private_key.pem")
-	svc, userRepo, tokenRepo := newSvc()
+	svc, userRepo, tokenRepo, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.DefaultCost)
-	user := &model.User{Username: "alice", Password: string(hashed), Role: model.RoleUser}
+	role := userRole()
+	user := &model.User{Username: "alice", Password: string(hashed), RoleID: role.ID, Role: role}
 	user.ID = 1
 
 	userRepo.On("FindByUsername", "alice").Return(user, nil).Once()
@@ -92,7 +108,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 }
 
 func TestAuthService_Login_UserNotFound(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	userRepo.On("FindByUsername", "ghost").Return(nil, errors.New("not found")).Once()
 
@@ -104,7 +120,7 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
 	user := &model.User{Username: "alice", Password: string(hashed)}
@@ -121,11 +137,12 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 
 func TestAuthService_Refresh_Success(t *testing.T) {
 	os.Setenv("PRIVATE_KEY_PATH", "../../../private_key.pem")
-	svc, _, tokenRepo := newSvc()
+	svc, _, tokenRepo, _ := newSvc()
 
 	rawToken := "validrawtoken123"
 	hash := hashRaw(rawToken)
-	user := model.User{Username: "alice", Role: model.RoleUser}
+	role := userRole()
+	user := model.User{Username: "alice", RoleID: role.ID, Role: role}
 	user.ID = 1
 
 	rt := &model.RefreshToken{
@@ -147,7 +164,7 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 }
 
 func TestAuthService_Refresh_TokenNotFound(t *testing.T) {
-	svc, _, tokenRepo := newSvc()
+	svc, _, tokenRepo, _ := newSvc()
 
 	tokenRepo.On("FindByTokenHash", mock.Anything).Return(nil, errors.New("not found")).Once()
 
@@ -159,7 +176,7 @@ func TestAuthService_Refresh_TokenNotFound(t *testing.T) {
 }
 
 func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
-	svc, _, tokenRepo := newSvc()
+	svc, _, tokenRepo, _ := newSvc()
 
 	rawToken := "expiredtoken"
 	hash := hashRaw(rawToken)
@@ -179,7 +196,7 @@ func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
 // ── Logout ────────────────────────────────────────────────────────────────────
 
 func TestAuthService_Logout_Success(t *testing.T) {
-	svc, _, tokenRepo := newSvc()
+	svc, _, tokenRepo, _ := newSvc()
 
 	rawToken := "sometoken"
 	hash := hashRaw(rawToken)
@@ -194,7 +211,7 @@ func TestAuthService_Logout_Success(t *testing.T) {
 // ── LogoutAll ─────────────────────────────────────────────────────────────────
 
 func TestAuthService_LogoutAll_Success(t *testing.T) {
-	svc, _, tokenRepo := newSvc()
+	svc, _, tokenRepo, _ := newSvc()
 
 	tokenRepo.On("DeleteByUserID", uint(42)).Return(nil).Once()
 
@@ -207,7 +224,7 @@ func TestAuthService_LogoutAll_Success(t *testing.T) {
 // ── GetProfile ────────────────────────────────────────────────────────────────
 
 func TestAuthService_GetProfile_Success(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	expected := &model.User{Username: "alice", Email: "alice@example.com"}
 	expected.ID = 1
@@ -221,7 +238,7 @@ func TestAuthService_GetProfile_Success(t *testing.T) {
 }
 
 func TestAuthService_GetProfile_NotFound(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	userRepo.On("FindByID", uint(99)).Return(nil, errors.New("not found")).Once()
 
@@ -235,7 +252,7 @@ func TestAuthService_GetProfile_NotFound(t *testing.T) {
 // ── ChangePassword ────────────────────────────────────────────────────────────
 
 func TestAuthService_ChangePassword_Success(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("old"), bcrypt.DefaultCost)
 	user := &model.User{Password: string(hashed)}
@@ -251,7 +268,7 @@ func TestAuthService_ChangePassword_Success(t *testing.T) {
 }
 
 func TestAuthService_ChangePassword_WrongCurrentPassword(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
 	user := &model.User{Password: string(hashed)}
@@ -266,7 +283,7 @@ func TestAuthService_ChangePassword_WrongCurrentPassword(t *testing.T) {
 }
 
 func TestAuthService_ChangePassword_UserNotFound(t *testing.T) {
-	svc, userRepo, _ := newSvc()
+	svc, userRepo, _, _ := newSvc()
 
 	userRepo.On("FindByID", uint(99)).Return(nil, errors.New("not found")).Once()
 

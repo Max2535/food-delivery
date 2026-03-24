@@ -61,7 +61,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
-			"role":     user.Role,
+			"role":     user.Role.Name,
 		},
 	})
 }
@@ -208,7 +208,7 @@ func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
 		"id":         user.ID,
 		"username":   user.Username,
 		"email":      user.Email,
-		"role":       user.Role,
+		"role":       user.Role.Name,
 		"created_at": user.CreatedAt,
 	})
 }

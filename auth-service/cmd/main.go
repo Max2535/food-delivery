@@ -79,7 +79,8 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	resetTokenRepo := repository.NewPasswordResetTokenRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo)
+	roleRepo := repository.NewRoleRepository(db)
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, roleRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users

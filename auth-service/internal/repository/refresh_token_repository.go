@@ -31,6 +31,7 @@ func (r *refreshTokenRepository) FindByTokenHash(hash string) (*model.RefreshTok
 	var token model.RefreshToken
 	err := r.db.Where("token_hash = ?", hash).
 		Preload("User").
+		Preload("User.Role").
 		First(&token).Error
 	return &token, err
 }
