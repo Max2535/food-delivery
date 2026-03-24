@@ -152,6 +152,7 @@ func main() {
 	auth.Get("/groups", authHandler.ListGroups)
 	auth.Post("/group", authHandler.CreateGroup)
 	auth.Put("/group", authHandler.UpdateGroup)
+	auth.Delete("/group/:id", authHandler.DeleteGroup)
 	auth.Get("/roles", authHandler.ListRoles)
 
 	port := os.Getenv("PORT")

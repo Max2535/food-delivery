@@ -602,6 +602,37 @@ func (h *AuthHandler) UpdateGroup(c *fiber.Ctx) error {
 	})
 }
 
+// DeleteGroup godoc
+// @Summary Delete group
+// @Description Delete a user group by ID
+// @Tags auth
+// @Produce json
+// @Param id path int true "Group ID"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      404  {object}  object{error=string}
+// @Failure      500  {object}  object{error=string}
+// @Router /api/v1/auth/group/{id} [delete]
+func (h *AuthHandler) DeleteGroup(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid group ID"})
+	}
+
+	if err := h.authService.DeleteGroup(uint(id)); err != nil {
+		if errors.Is(err, service.ErrGroupNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "group not found"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("delete group failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint64("group_id", id).Msg("group deleted")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "group deleted successfully"})
+}
+
 // ── Helper ───────────────────────────────────────────────────────
 
 func extractUserID(c *fiber.Ctx) (uint, error) {

@@ -49,3 +49,19 @@ export async function PUT(req: NextRequest) {
   const data = await res.json().catch(() => null);
   return NextResponse.json(data ?? { message: "Unknown error" }, { status: res.status });
 }
+
+export async function DELETE(req: NextRequest) {
+  const authHeader = req.headers.get("authorization") || "";
+  const { id } = await req.json();
+
+  const res = await fetch(`${API_URL}/v1/auth/group/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+  });
+
+  const data = await res.json().catch(() => null);
+  return NextResponse.json(data ?? { message: "Unknown error" }, { status: res.status });
+}

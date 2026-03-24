@@ -13,6 +13,7 @@ type GroupRepository interface {
 	Create(group *model.Group) error
 	FindByID(id uint) (*model.Group, error)
 	Update(group *model.Group) error
+	Delete(group *model.Group) error
 	FindRolesByIDs(ids []uint) ([]model.Role, error)
 }
 
@@ -57,6 +58,13 @@ func (r *groupRepository) Update(group *model.Group) error {
 		return err
 	}
 	return r.db.Save(group).Error
+}
+
+func (r *groupRepository) Delete(group *model.Group) error {
+	if err := r.db.Model(group).Association("Roles").Clear(); err != nil {
+		return err
+	}
+	return r.db.Delete(group).Error
 }
 
 func (r *groupRepository) FindRolesByIDs(ids []uint) ([]model.Role, error) {

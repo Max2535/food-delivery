@@ -39,6 +39,7 @@ type AuthService interface {
 	ListRoles() ([]*model.Role, error)
 	CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
 	UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
+	DeleteGroup(id uint) error
 }
 
 type authService struct {
@@ -261,6 +262,14 @@ func (s *authService) UpdateGroup(id uint, name, description string, isActive bo
 	}
 
 	return group, nil
+}
+
+func (s *authService) DeleteGroup(id uint) error {
+	group, err := s.groupRepo.FindByID(id)
+	if err != nil {
+		return ErrGroupNotFound
+	}
+	return s.groupRepo.Delete(group)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

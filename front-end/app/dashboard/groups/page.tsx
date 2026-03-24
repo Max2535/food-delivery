@@ -305,24 +305,96 @@ export default function GroupsPage() {
     setShowModal(false);
   }
 
-  function toggleActive(id: string) {
+  async function toggleActive(id: string) {
+    const accessToken = (session as any)?.accessToken;
+    if (!accessToken) return;
+
+    const group = groups.find((g) => g.id === id);
+    if (!group) return;
+
+    const newIsActive = !group.is_active;
+
+    // Optimistic update
     setGroups((prev) =>
       prev.map((g) =>
         g.id === id
-          ? { ...g, is_active: !g.is_active, updated_at: new Date().toISOString() }
+          ? { ...g, is_active: newIsActive, updated_at: new Date().toISOString() }
           : g
       )
     );
+
+    try {
+      const res = await fetch("/api/auth/groups", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          id: Number(id),
+          name: group.name,
+          description: group.description,
+          is_active: newIsActive,
+          role_ids: group.role_ids,
+        }),
+      });
+
+      if (!res.ok) {
+        // Revert on failure
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === id ? { ...g, is_active: group.is_active } : g
+          )
+        );
+        const err = await res.json().catch(() => null);
+        console.error("อัพเดทสถานะกลุ่มไม่สำเร็จ", res.status, err);
+        alert("อัพเดทสถานะไม่สำเร็จ: " + (err?.message ?? res.statusText));
+      }
+    } catch (err) {
+      // Revert on error
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === id ? { ...g, is_active: group.is_active } : g
+        )
+      );
+      console.error("อัพเดทสถานะกลุ่มไม่สำเร็จ", err);
+      alert("เกิดข้อผิดพลาดในการอัพเดทสถานะ");
+    }
   }
 
   function confirmDelete(id: string) {
     setDeletingId(id);
   }
 
-  function handleDelete() {
-    if (deletingId) {
+  async function handleDelete() {
+    if (!deletingId) return;
+
+    const accessToken = (session as any)?.accessToken;
+    if (!accessToken) return;
+
+    try {
+      const res = await fetch("/api/auth/groups", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ id: Number(deletingId) }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        console.error("ลบกลุ่มไม่สำเร็จ", res.status, err);
+        alert("ลบกลุ่มไม่สำเร็จ: " + (err?.message ?? res.statusText));
+        return;
+      }
+
       setGroups((prev) => prev.filter((g) => g.id !== deletingId));
       if (detailGroup?.id === deletingId) setDetailGroup(null);
+    } catch (err) {
+      console.error("ลบกลุ่มไม่สำเร็จ", err);
+      alert("เกิดข้อผิดพลาดในการลบกลุ่ม");
+    } finally {
       setDeletingId(null);
     }
   }
