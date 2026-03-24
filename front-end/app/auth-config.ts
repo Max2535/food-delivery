@@ -3,6 +3,16 @@ import Credentials from "next-auth/providers/credentials";
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
+function parseJwtPayload(token: string): Record<string, unknown> {
+  try {
+    const base64 = token.split(".")[1];
+    const json = Buffer.from(base64, "base64").toString("utf-8");
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
@@ -25,12 +35,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const data = await res.json();
 
+        const claims = parseJwtPayload(data.access_token ?? "");
+
         return {
           id: String(data.user_id ?? data.id ?? ""),
           name: data.username ?? username,
           email: data.email ?? "",
           accessToken: data.access_token,
           refreshToken: data.refresh_token,
+          roles: (claims.roles as string[]) ?? ["viewer"],
         };
       },
     }),
@@ -41,6 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.accessToken = (user as any).accessToken;
         token.refreshToken = (user as any).refreshToken;
         token.userId = user.id;
+        token.roles = (user as any).roles;
       }
       return token;
     },
@@ -48,6 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       (session as any).accessToken = token.accessToken;
       (session as any).refreshToken = token.refreshToken;
       (session as any).userId = token.userId;
+      (session as any).roles = token.roles;
       return session;
     },
   },

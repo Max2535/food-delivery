@@ -2,9 +2,13 @@
 
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import { NAV_ITEMS, filterNavByRoles } from "./nav-config";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+
+  const userRoles: string[] = (session as any)?.roles ?? [];
+  const visibleNav = filterNavByRoles(NAV_ITEMS, userRoles);
 
   return (
     <nav className="bg-white shadow">
@@ -18,9 +22,15 @@ export default function Navbar() {
             <span className="text-sm text-gray-400">...</span>
           ) : session?.user ? (
             <>
-              <Link href="/dashboard" className="text-sm text-gray-700 hover:text-blue-600">
-                Dashboard
-              </Link>
+              {visibleNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm text-gray-700 hover:text-blue-600"
+                >
+                  {item.label}
+                </Link>
+              ))}
               <span className="text-sm text-gray-500">{session.user.name}</span>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
