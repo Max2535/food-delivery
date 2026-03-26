@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     roles: [],
     items: [
       { label: "รายการเดินสต๊อก", href: "/dashboard/inventory", roles: ["admin", "manager"] },
+      { label: "สต๊อกคงเหลือ", href: "/dashboard/inventory/stock", roles: ["admin", "manager"] },
     ],
   },
 ];

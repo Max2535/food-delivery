@@ -1,38 +1,34 @@
 package model
 
 import (
-	"time"
+	"gorm.io/gorm"
+)
+
+const (
+	New       = "new"
+	Pending   = "pending"
+	Confirmed = "confirmed"
+	Shipped   = "shipped"
+	Failed    = "failed"
+	Delivered = "delivered"
+	Finished  = "finished"
 )
 
 type Order struct {
-	// ใช้ uint เป็น ID ตามมาตรฐาน GORM พร้อมกำหนด auto-increment
-	ID uint `gorm:"primaryKey;autoIncrement" json:"id"`
-
-	// OrderID is an alias for ID to support legacy clients/tests that expect order_id
-	OrderID uint `gorm:"-" json:"order_id"`
-
-	// CustomerID ควรเป็น string (UUID) เพื่อรองรับการเชื่อมโยงกับ Identity Service อื่น
-	CustomerID string `gorm:"type:varchar(100);not null" json:"customer_id"`
-
+	gorm.Model
+	CustomerID  string  `gorm:"type:varchar(100);not null" json:"customer_id"`
 	TotalAmount float64 `gorm:"type:decimal(10,2)" json:"total_amount"`
 
-	// Status สำหรับทำ State Machine เช่น Pending, Confirmed, Shipped
-	Status string `gorm:"type:varchar(20);default:'Pending'" json:"status"`
-
-	// DeliveryAddress stores the snapshot of the customer address at the time of ordering
-	DeliveryAddress string `gorm:"type:text" json:"delivery_address"`
-
-	// Items is the list of items in the order
-	Items []OrderItem `gorm:"foreignKey:OrderID" json:"items"`
-
-	// GORM จะจัดการค่า CreatedAt และ UpdatedAt ให้โดยอัตโนมัติ
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// Status => new, pending, confirmed, shipped, failed, delivered, finished
+	Status          string      `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	DeliveryAddress string      `gorm:"type:text" json:"delivery_address"`
+	Items           []OrderItem `gorm:"foreignKey:OrderID" json:"items"`
 }
 
 type OrderItem struct {
-	ID         uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	gorm.Model
 	OrderID    uint    `gorm:"not null" json:"order_id"`
-	MenuItemID string  `gorm:"type:varchar(100);not null" json:"menu_item_id"`
+	MenuItemID uint    `gorm:"not null" json:"menu_item_id"`
 	Quantity   int     `gorm:"not null" json:"quantity"`
+	UnitPrice  float64 `gorm:"type:decimal(10,2);not null" json:"unit_price"`
 }

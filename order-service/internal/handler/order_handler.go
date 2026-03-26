@@ -48,7 +48,6 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		Str("correlation_id", correlationID).
 		Msg("Order created successfully")
 
-	order.OrderID = order.ID
 	return c.Status(fiber.StatusCreated).JSON(order)
 }
 
@@ -74,9 +73,6 @@ func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 		Int("count", len(orders)).
 		Msg("Fetched all orders")
 
-	for i := range orders {
-		orders[i].OrderID = orders[i].ID
-	}
 	return c.JSON(orders)
 }
 
@@ -109,7 +105,5 @@ func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 		Str("correlation_id", correlationID).
 		Int("order_id", id).
 		Msg("Fetched order by ID")
-
-	order.OrderID = order.ID
 	return c.JSON(order)
 }

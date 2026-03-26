@@ -111,15 +111,25 @@ func main() {
 	// Seed test users
 	testUsers := []struct{ username, password, email string }{
 		{"admin", "admin", "admin@food-delivery.com"},
-		{"rider_01", "securepassword123", "rider01@food-delivery.com"},
-		{"customer_01", "password123", "customer@food-delivery.com"},
-		{"validuser", "validpassword", "validuser@example.com"},
+		// {"rider_01", "securepassword123", "rider01@food-delivery.com"},
+		// {"customer_01", "password123", "customer@food-delivery.com"},
+		// {"validuser", "validpassword", "validuser@example.com"},
 	}
 	for _, u := range testUsers {
-		if _, err := authSvc.Register(u.username, u.password, u.email); err != nil {
+		user, err := authSvc.Register(u.username, u.password, u.email)
+		if err != nil {
 			log.Warn().Err(err).Str("username", u.username).Msg("Could not seed user (may already exist)")
+			continue
+		}
+		// Assign admin group
+		adminGroup := model.Group{}
+		if err := db.Where("name = ?", model.GroupAdmin).Preload("Roles").First(&adminGroup).Error; err == nil {
+			user.GroupID = adminGroup.ID
+			user.Group = adminGroup
+			db.Save(user)
+			log.Info().Str("username", u.username).Str("group", model.GroupAdmin).Msg("Seeded user with admin group")
 		} else {
-			log.Info().Str("username", u.username).Msg("Seeded user successfully")
+			log.Warn().Err(err).Str("username", u.username).Msg("Admin group not found, user keeps default group")
 		}
 	}
 

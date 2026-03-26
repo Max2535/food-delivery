@@ -161,7 +161,7 @@ export default function Navbar() {
               <div className="h-8 w-24 bg-gray-100 rounded-lg animate-pulse" />
             ) : session?.user ? (
               <>
-                <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
+                <Link href="/auth/profile" className="flex items-center gap-2 pl-3 border-l border-gray-200 hover:opacity-80 transition-opacity">
                   <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                     {(session.user.name ?? "U")[0].toUpperCase()}
                   </div>
@@ -169,7 +169,7 @@ export default function Navbar() {
                     <p className="font-medium text-gray-700 leading-tight">{session.user.name}</p>
                     <p className="text-xs text-gray-400 leading-tight">{(session as any)?.group ?? ""}</p>
                   </div>
-                </div>
+                </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
                   className="text-sm text-gray-500 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
@@ -224,7 +224,7 @@ export default function Navbar() {
             ) : session?.user ? (
               <>
                 {/* User info */}
-                <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-gray-50 rounded-xl">
+                <Link href="/auth/profile" className="flex items-center gap-3 px-3 py-3 mb-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
                     {(session.user.name ?? "U")[0].toUpperCase()}
                   </div>
@@ -232,7 +232,7 @@ export default function Navbar() {
                     <p className="font-medium text-gray-800">{session.user.name}</p>
                     <p className="text-xs text-gray-400">{session.user.email}</p>
                   </div>
-                </div>
+                </Link>
 
                 {/* Nav groups */}
                 {visibleGroups.map((group) => (
