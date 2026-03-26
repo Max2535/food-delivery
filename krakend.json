@@ -23,15 +23,16 @@
       "endpoint": "/v1/orders",
       "method": "POST",
       "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id",
+        "X-User-Roles"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
           "jwk_local_path": "/etc/krakend/public_key.json",
-          "jwk_url": "http://localhost:8080",
-          "roles": [
-            "user",
-            "admin"
-          ],
           "disable_jwk_security": true,
           "propagate_claims": [
             [
@@ -50,6 +51,42 @@
           "url_pattern": "/api/v1/orders",
           "host": [
             "http://order-service-api:3000"
+          ],
+          "encoding": "no-op"
+        }
+      ]
+    },{
+      "endpoint": "/v1/orders",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id",
+        "X-User-Roles"
+      ],
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_local_path": "/etc/krakend/public_key.json",
+          "disable_jwk_security": true,
+          "propagate_claims": [
+            [
+              "user_id",
+              "X-User-Id"
+            ],
+            [
+              "roles",
+              "X-User-Roles"
+            ]
+          ]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/v1/orders",
+          "host": [
+             "http://order-service-api:3000"
           ],
           "encoding": "no-op"
         }
@@ -97,6 +134,11 @@
       "endpoint": "/v1/catalog/menus",
       "method": "POST",
       "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -123,6 +165,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}",
       "method": "PUT",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -148,6 +195,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -185,6 +237,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/bom",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -210,6 +267,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/bom/{bom_id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -235,6 +297,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/station",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -272,6 +339,11 @@
     {
       "endpoint": "/v1/catalog/ingredients",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -309,6 +381,11 @@
     {
       "endpoint": "/v1/catalog/stations",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -346,6 +423,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/choices",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -371,6 +453,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -396,6 +483,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}/options",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -421,6 +513,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/choices/{group_id}/options/{option_id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -458,6 +555,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/addons",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -483,6 +585,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/addons/{addon_id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -520,6 +627,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/portions",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -545,6 +657,11 @@
     {
       "endpoint": "/v1/catalog/menus/{id}/portions/{portion_id}",
       "method": "DELETE",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -606,6 +723,11 @@
     {
       "endpoint": "/v1/inventory/materials",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -631,6 +753,11 @@
     {
       "endpoint": "/v1/inventory/materials/{id}",
       "method": "PUT",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -656,6 +783,11 @@
     {
       "endpoint": "/v1/inventory/stock/restock",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -681,6 +813,11 @@
     {
       "endpoint": "/v1/inventory/stock/adjust",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -706,6 +843,11 @@
     {
       "endpoint": "/v1/inventory/stock/deduct",
       "method": "POST",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -731,6 +873,11 @@
     {
       "endpoint": "/v1/inventory/transactions",
       "method": "GET",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
@@ -756,6 +903,11 @@
     {
       "endpoint": "/v1/inventory/transactions/{material_id}",
       "method": "GET",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-User-Id"
+      ],
       "extra_config": {
         "auth/validator": {
           "alg": "RS256",
