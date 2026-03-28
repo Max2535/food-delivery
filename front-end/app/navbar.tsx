@@ -4,7 +4,8 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { NAV_GROUPS, filterNavGroupsByRoles } from "./nav-config";
+import { fetchMenuConfig } from "./nav-config";
+import type { NavGroup } from "./nav-config";
 
 function DropdownMenu({
   label,
@@ -109,8 +110,16 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  const userRoles: string[] = (session as any)?.roles ?? [];
-  const visibleGroups = filterNavGroupsByRoles(NAV_GROUPS, userRoles);
+  const [visibleGroups, setVisibleGroups] = useState<NavGroup[]>([]);
+
+  useEffect(() => {
+    const token = (session as any)?.accessToken;
+    if (!token) {
+      setVisibleGroups([]);
+      return;
+    }
+    fetchMenuConfig(token).then(setVisibleGroups);
+  }, [session]);
 
   // Close mobile menu on route change
   useEffect(() => {

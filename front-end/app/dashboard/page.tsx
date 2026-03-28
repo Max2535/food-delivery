@@ -2,9 +2,10 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { NAV_GROUPS, filterNavGroupsByRoles } from "../nav-config";
+import { fetchMenuConfig } from "../nav-config";
+import type { NavGroup } from "../nav-config";
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   Auth: (
@@ -45,12 +46,22 @@ const SECTION_COLORS: Record<string, { bg: string; text: string; border: string 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [visibleGroups, setVisibleGroups] = useState<NavGroup[]>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/auth/login");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const token = (session as any)?.accessToken;
+    if (!token) {
+      setVisibleGroups([]);
+      return;
+    }
+    fetchMenuConfig(token).then(setVisibleGroups);
+  }, [session]);
 
   if (status === "loading") {
     return (
@@ -61,9 +72,6 @@ export default function DashboardPage() {
   }
 
   if (!session) return null;
-
-  const userRoles: string[] = (session as any)?.roles ?? [];
-  const visibleGroups = filterNavGroupsByRoles(NAV_GROUPS, userRoles);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">

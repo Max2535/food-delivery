@@ -59,7 +59,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	if err := db.AutoMigrate(&model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}); err != nil {
+	if err := db.AutoMigrate(&model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}, &model.NavGroup{}, &model.NavItem{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
 	}
 
@@ -100,12 +100,45 @@ func main() {
 		}
 	}
 
+	// Seed Nav Menu Config
+	for i, seed := range model.DefaultNavMenuSeed {
+		var existing model.NavGroup
+		if err := db.Where("label = ?", seed.Label).First(&existing).Error; err == nil {
+			continue // already seeded
+		}
+		groupRolesForNav := make([]model.Role, 0, len(seed.Roles))
+		for _, rn := range seed.Roles {
+			if r, ok := roleMap[rn]; ok {
+				groupRolesForNav = append(groupRolesForNav, r)
+			}
+		}
+		navGroup := model.NavGroup{Label: seed.Label, SortOrder: i, Roles: groupRolesForNav}
+		if err := db.Create(&navGroup).Error; err != nil {
+			log.Error().Err(err).Str("label", seed.Label).Msg("Failed to seed nav group")
+			continue
+		}
+		for j, si := range seed.Items {
+			itemRoles := make([]model.Role, 0, len(si.Roles))
+			for _, rn := range si.Roles {
+				if r, ok := roleMap[rn]; ok {
+					itemRoles = append(itemRoles, r)
+				}
+			}
+			navItem := model.NavItem{NavGroupID: navGroup.ID, Label: si.Label, Href: si.Href, SortOrder: j, Roles: itemRoles}
+			if err := db.Create(&navItem).Error; err != nil {
+				log.Error().Err(err).Str("label", si.Label).Msg("Failed to seed nav item")
+			}
+		}
+		log.Info().Str("label", seed.Label).Int("items", len(seed.Items)).Msg("Seeded nav group")
+	}
+
 	// Initialize Layers
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	resetTokenRepo := repository.NewPasswordResetTokenRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, groupRepo)
+	navMenuRepo := repository.NewNavMenuRepository(db)
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, groupRepo, navMenuRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users
@@ -164,6 +197,7 @@ func main() {
 	auth.Put("/group", authHandler.UpdateGroup)
 	auth.Delete("/group/:id", authHandler.DeleteGroup)
 	auth.Get("/roles", authHandler.ListRoles)
+	auth.Get("/menu-config", authHandler.GetMenuConfig)
 
 	port := os.Getenv("PORT")
 	if port == "" {

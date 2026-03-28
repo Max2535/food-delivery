@@ -51,6 +51,11 @@ func (m *MockGroupRepository) Update(group *model.Group) error {
 	return args.Error(0)
 }
 
+func (m *MockGroupRepository) Delete(group *model.Group) error {
+	args := m.Called(group)
+	return args.Error(0)
+}
+
 func (m *MockGroupRepository) FindRolesByIDs(ids []uint) ([]model.Role, error) {
 	args := m.Called(ids)
 	if args.Get(0) == nil {

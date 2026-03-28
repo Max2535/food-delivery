@@ -633,6 +633,34 @@ func (h *AuthHandler) DeleteGroup(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "group deleted successfully"})
 }
 
+// GetMenuConfig godoc
+// @Summary      Get navigation menu config for current user
+// @Tags         auth
+// @Produce      json
+// @Param        X-User-Id header string true "User ID (injected by gateway)"
+// @Success      200  {object}  object{menu=[]object{label=string,roles=[]string,items=[]object{label=string,href=string,roles=[]string}}}
+// @Failure      401  {object}  object{error=string}
+// @Failure      404  {object}  object{error=string}
+// @Router       /api/v1/auth/menu-config [get]
+func (h *AuthHandler) GetMenuConfig(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	userID, err := extractUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+
+	menu, err := h.authService.GetMenuConfig(userID)
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("get menu config failed")
+		if errors.Is(err, service.ErrUserNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"menu": menu})
+}
+
 // ── Helper ───────────────────────────────────────────────────────
 
 func extractUserID(c *fiber.Ctx) (uint, error) {

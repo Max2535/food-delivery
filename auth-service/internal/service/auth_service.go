@@ -40,6 +40,7 @@ type AuthService interface {
 	CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
 	UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
 	DeleteGroup(id uint) error
+	GetMenuConfig(userID uint) ([]model.NavGroupResponse, error)
 }
 
 type authService struct {
@@ -47,6 +48,7 @@ type authService struct {
 	tokenRepo      repository.RefreshTokenRepository
 	resetTokenRepo repository.PasswordResetTokenRepository
 	groupRepo      repository.GroupRepository
+	navMenuRepo    repository.NavMenuRepository
 }
 
 func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, opts ...any) AuthService {
@@ -57,6 +59,8 @@ func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.Ref
 			s.resetTokenRepo = v
 		case repository.GroupRepository:
 			s.groupRepo = v
+		case repository.NavMenuRepository:
+			s.navMenuRepo = v
 		}
 	}
 	return s
@@ -270,6 +274,26 @@ func (s *authService) DeleteGroup(id uint) error {
 		return ErrGroupNotFound
 	}
 	return s.groupRepo.Delete(group)
+}
+
+func (s *authService) GetMenuConfig(userID uint) ([]model.NavGroupResponse, error) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	groups, err := s.navMenuRepo.ListAll()
+	if err != nil {
+		return nil, err
+	}
+
+	allResponses := make([]model.NavGroupResponse, len(groups))
+	for i, g := range groups {
+		allResponses[i] = g.ToResponse()
+	}
+
+	roles := user.Group.RoleNames()
+	return model.FilterNavMenuByRoles(allResponses, roles), nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

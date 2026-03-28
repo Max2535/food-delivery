@@ -106,3 +106,16 @@ func (m *MockAuthService) GetGroupByID(groupID uint) (*model.Group, error) {
 	}
 	return args.Get(0).(*model.Group), args.Error(1)
 }
+
+func (m *MockAuthService) DeleteGroup(id uint) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) GetMenuConfig(userID uint) ([]model.NavGroupResponse, error) {
+	args := m.Called(userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.NavGroupResponse), args.Error(1)
+}
