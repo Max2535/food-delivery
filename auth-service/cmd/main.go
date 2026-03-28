@@ -59,8 +59,22 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	if err := db.AutoMigrate(&model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}, &model.NavGroup{}, &model.NavItem{}); err != nil {
+	if err := db.AutoMigrate(&model.Permission{}, &model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}, &model.NavGroup{}, &model.NavItem{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
+	}
+
+	// Seed Permissions
+	permMap := make(map[string]model.Permission)
+	for _, p := range model.AllPermissions {
+		var perm model.Permission
+		if err := db.Where("name = ?", p.Name).First(&perm).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				perm = model.Permission{Name: p.Name, Description: p.Description}
+				db.Create(&perm)
+				log.Info().Str("permission", p.Name).Msg("Seeded permission")
+			}
+		}
+		permMap[p.Name] = perm
 	}
 
 	// Seed Roles
@@ -71,8 +85,18 @@ func main() {
 			if err == gorm.ErrRecordNotFound {
 				role = model.Role{Name: roleName}
 				db.Create(&role)
-				log.Info().Str("role", roleName).Msg("Seeded role successfully")
+				log.Info().Str("role", roleName).Msg("Seeded role")
 			}
+		}
+		// Assign permissions to role (idempotent — replace)
+		if permNames, ok := model.RolePermissions[roleName]; ok {
+			perms := make([]model.Permission, 0, len(permNames))
+			for _, pn := range permNames {
+				if p, ok := permMap[pn]; ok {
+					perms = append(perms, p)
+				}
+			}
+			db.Model(&role).Association("Permissions").Replace(perms)
 		}
 		roleMap[roleName] = role
 	}
@@ -95,7 +119,7 @@ func main() {
 				}
 				group = model.Group{Name: groupName, Roles: roles}
 				db.Create(&group)
-				log.Info().Str("group", groupName).Int("roles", len(roles)).Msg("Seeded group successfully")
+				log.Info().Str("group", groupName).Int("roles", len(roles)).Msg("Seeded group")
 			}
 		}
 	}
@@ -106,25 +130,25 @@ func main() {
 		if err := db.Where("label = ?", seed.Label).First(&existing).Error; err == nil {
 			continue // already seeded
 		}
-		groupRolesForNav := make([]model.Role, 0, len(seed.Roles))
-		for _, rn := range seed.Roles {
-			if r, ok := roleMap[rn]; ok {
-				groupRolesForNav = append(groupRolesForNav, r)
+		groupPerms := make([]model.Permission, 0, len(seed.Permissions))
+		for _, pn := range seed.Permissions {
+			if p, ok := permMap[pn]; ok {
+				groupPerms = append(groupPerms, p)
 			}
 		}
-		navGroup := model.NavGroup{Label: seed.Label, SortOrder: i, Roles: groupRolesForNav}
+		navGroup := model.NavGroup{Label: seed.Label, SortOrder: i, Permissions: groupPerms}
 		if err := db.Create(&navGroup).Error; err != nil {
 			log.Error().Err(err).Str("label", seed.Label).Msg("Failed to seed nav group")
 			continue
 		}
 		for j, si := range seed.Items {
-			itemRoles := make([]model.Role, 0, len(si.Roles))
-			for _, rn := range si.Roles {
-				if r, ok := roleMap[rn]; ok {
-					itemRoles = append(itemRoles, r)
+			itemPerms := make([]model.Permission, 0, len(si.Permissions))
+			for _, pn := range si.Permissions {
+				if p, ok := permMap[pn]; ok {
+					itemPerms = append(itemPerms, p)
 				}
 			}
-			navItem := model.NavItem{NavGroupID: navGroup.ID, Label: si.Label, Href: si.Href, SortOrder: j, Roles: itemRoles}
+			navItem := model.NavItem{NavGroupID: navGroup.ID, Label: si.Label, Href: si.Href, SortOrder: j, Permissions: itemPerms}
 			if err := db.Create(&navItem).Error; err != nil {
 				log.Error().Err(err).Str("label", si.Label).Msg("Failed to seed nav item")
 			}

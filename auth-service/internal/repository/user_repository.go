@@ -29,19 +29,19 @@ func (r *userRepository) Create(user *model.User) error {
 
 func (r *userRepository) FindByUsername(username string) (*model.User, error) {
 	var user model.User
-	err := r.db.Preload("Group").Preload("Group.Roles").Where("username = ?", username).First(&user).Error
+	err := r.db.Preload("Group").Preload("Group.Roles").Preload("Group.Roles.Permissions").Where("username = ?", username).First(&user).Error
 	return &user, err
 }
 
 func (r *userRepository) FindByEmail(email string) (*model.User, error) {
 	var user model.User
-	err := r.db.Preload("Group").Preload("Group.Roles").Where("email = ?", email).First(&user).Error
+	err := r.db.Preload("Group").Preload("Group.Roles").Preload("Group.Roles.Permissions").Where("email = ?", email).First(&user).Error
 	return &user, err
 }
 
 func (r *userRepository) FindByID(id uint) (*model.User, error) {
 	var user model.User
-	err := r.db.Preload("Group").Preload("Group.Roles").First(&user, id).Error
+	err := r.db.Preload("Group").Preload("Group.Roles").Preload("Group.Roles.Permissions").First(&user, id).Error
 	return &user, err
 }
 

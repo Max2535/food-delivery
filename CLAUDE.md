@@ -93,10 +93,10 @@ Never share a database between services. Each service owns its schema and connec
 3. Extracted claims (`user_id`) forwarded as `X-User-Id` header to backend
 4. Services do NOT validate JWT themselves — trust the gateway
 
-**Group-based role model:** Users belong to a Group, and each Group has multiple Roles (many-to-many via `group_roles` join table). JWT claims include both `group` (string) and `roles` (string array).
+**Group-based role model with permissions:** Users belong to a Group, each Group has multiple Roles (many-to-many via `group_roles`), and each Role has multiple Permissions (many-to-many via `role_permissions`). JWT claims include both `group` (string) and `roles` (string array). Permissions are resolved server-side from roles.
 
 ```
-User (group_id FK) → Group ←many2many→ Role
+User (group_id FK) → Group ←M2M→ Role ←M2M→ Permission
 ```
 
 **Seeded groups:**
@@ -108,6 +108,17 @@ User (group_id FK) → Group ←many2many→ Role
 | merchant | merchant, user |
 | admin | admin, merchant, rider, customer, user |
 
+**Permissions** use `module.resource.action` format (e.g. `auth.groups.view`, `catalog.menus.manage`). 18 permissions seeded across 5 modules.
+
+**Role → Permission mapping:**
+| Role | Permissions |
+|------|------------|
+| admin | all 18 permissions |
+| merchant | catalog.*, kitchen.*, orders.view/manage/queue, inventory.* |
+| rider | orders.queue.view, orders.view |
+| customer | orders.create, orders.view |
+| user | (none) |
+
 New users registered via `/v1/auth/register` are assigned to the `user` group by default.
 
 **JWT claims example:**
@@ -116,6 +127,23 @@ New users registered via `/v1/auth/register` are assigned to the `user` group by
 ```
 
 **API response (register/profile)** returns `group` (string) and `roles` (string array) instead of a single `role` field.
+
+### Dynamic Navigation Menu (Permission-based)
+
+Navigation menu config is stored in the database (`nav_groups` + `nav_items` tables) with foreign keys to `permissions`. The frontend fetches filtered menus from `GET /v1/auth/menu-config` — the backend resolves the user's permissions from their roles and returns only the menu items the user is allowed to see.
+
+```
+nav_groups ←M2M→ permissions
+nav_items  ←M2M→ permissions
+```
+
+**Menu config flow:**
+1. Frontend calls `GET /v1/auth/menu-config` with JWT
+2. Backend resolves user → group → roles → permissions
+3. Filters `nav_groups`/`nav_items` by matching permissions
+4. Returns filtered menu JSON
+
+Menu config is seeded on service startup but can be modified via database without redeploying.
 
 **Auth endpoints:**
 | Endpoint | Method | Auth | Description |
@@ -129,8 +157,9 @@ New users registered via `/v1/auth/register` are assigned to the `user` group by
 | `/v1/auth/password` | PUT | JWT | Change password |
 | `/v1/auth/forgot-password` | POST | No | Request password reset token (returns token in dev mode) |
 | `/v1/auth/reset-password` | POST | No | Reset password using token (revokes all refresh tokens) |
+| `/v1/auth/menu-config` | GET | JWT | Get navigation menu filtered by user permissions |
 
-Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`, `/v1/auth/profile`, `/v1/auth/logout-all`, `/v1/auth/password`
+Protected endpoints: `POST /v1/orders`, write endpoints under `/v1/catalog/*`, `/v1/auth/profile`, `/v1/auth/logout-all`, `/v1/auth/password`, `/v1/auth/menu-config`
 
 ### Inter-Service Communication
 - **Sync (via gateway):** Client → KrakenD → Service
@@ -363,16 +392,20 @@ curl -X POST http://localhost:8080/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"token":"<reset_token>","new_password":"resetpass123"}'
 
-# 10. Create order (JWT required)
+# 10. Get navigation menu config (JWT required)
+curl http://localhost:8080/v1/auth/menu-config \
+  -H "Authorization: Bearer $TOKEN"
+
+# 11. Create order (JWT required)
 curl -X POST http://localhost:8080/v1/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"customer_id":"c1","total_amount":50.00}'
 
-# 11. Check kitchen ticket
+# 12. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
 
-# 12. Create a catalog menu item (JWT required)
+# 13. Create a catalog menu item (JWT required)
 curl -X POST http://localhost:8080/v1/catalog/menus \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \

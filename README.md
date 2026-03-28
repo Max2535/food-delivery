@@ -52,7 +52,7 @@ Observability:
 | Service | Port | Responsibility |
 |---------|------|----------------|
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
-| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset, group-based roles |
+| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset, group-based roles, permissions, dynamic nav menu |
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
@@ -180,6 +180,14 @@ curl -X POST http://localhost:8080/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"token": "<reset_token>", "new_password": "newsecret123"}'
 # Revokes all refresh tokens to force re-login on all devices
+```
+
+#### Get Navigation Menu Config (JWT required)
+```bash
+curl http://localhost:8080/v1/auth/menu-config \
+  -H "Authorization: Bearer $TOKEN"
+# Returns menu groups/items filtered by user's permissions (derived from roles)
+# Response: {"menu":[{"label":"Auth","permissions":["auth.groups.view",...],"items":[...]},...]}
 ```
 
 ### Orders (requires JWT)
@@ -433,7 +441,8 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 - **Refresh flow:** Client sends refresh_token → Auth Service rotates (delete old, issue new pair)
 - **Password reset flow:** Request token via email → validate token → set new password → revoke all refresh tokens
 - **Key rotation:** Replace `private_key.pem`, `public_key.pem`, and `public_key.json` (JWKS format)
-- **Authorization model:** Group-based roles — each user belongs to a Group, each Group has multiple Roles (many-to-many). New registrations default to the `user` group. JWT claims include `group` (string) and `roles` (string array).
+- **Authorization model:** Group-based roles with permissions — each user belongs to a Group, each Group has multiple Roles (many-to-many), and each Role has multiple Permissions (many-to-many via `role_permissions`). Permissions use `module.resource.action` format (e.g. `auth.groups.view`, `catalog.menus.manage`). New registrations default to the `user` group. JWT claims include `group` (string) and `roles` (string array). Permissions are resolved server-side from roles.
+- **Dynamic navigation menu:** Menu config stored in DB (`nav_groups`/`nav_items` with FK to `permissions`). Frontend fetches `GET /v1/auth/menu-config` — backend filters by user's permissions derived from roles.
 
 ## Environment Variables
 
@@ -521,6 +530,8 @@ The frontend is a Next.js application located in `front-end/`. It provides:
 | Reset Password | `/auth/reset-password` | Set new password using reset token (supports `?token=` URL param) |
 | Dashboard | `/dashboard` | Protected page (requires authentication) |
 
+The navigation menu is **dynamic and permission-based** — the navbar fetches `GET /api/auth/menu-config` on login, which returns only the menu items the user is allowed to see based on their role permissions.
+
 API proxy routes (`app/api/auth/`) forward requests to the backend Auth Service.
 
 > **Dev mode note:** The forgot-password endpoint returns the `reset_token` in the response body. Remove this field when integrating a real email service.
@@ -534,7 +545,7 @@ food-delivery/
 │   └── internal/
 │       ├── handler/        # HTTP handlers
 │       ├── middleware/      # Logger
-│       ├── model/           # User, Group, Role, RefreshToken, PasswordResetToken
+│       ├── model/           # User, Group, Role, Permission, NavGroup, NavItem, RefreshToken, PasswordResetToken
 │       ├── repository/      # Database layer
 │       └── service/         # JWT generation, business logic
 ├── order-service/
@@ -616,9 +627,39 @@ id, name (unique), created_at, updated_at, deleted_at
 id, name (unique), created_at, updated_at, deleted_at
 ```
 
+**permissions** (auth_db)
+```
+id, name (unique, format: module.resource.action), description, created_at, updated_at, deleted_at
+```
+
 **group_roles** (auth_db) — join table (many-to-many)
 ```
 group_id (FK→groups), role_id (FK→roles)
+```
+
+**role_permissions** (auth_db) — join table (many-to-many)
+```
+role_id (FK→roles), permission_id (FK→permissions)
+```
+
+**nav_groups** (auth_db) — navigation menu groups
+```
+id, label (unique), sort_order, created_at, updated_at, deleted_at
+```
+
+**nav_items** (auth_db) — navigation menu items
+```
+id, nav_group_id (FK→nav_groups), label, href, sort_order, created_at, updated_at, deleted_at
+```
+
+**nav_group_permissions** (auth_db) — join table
+```
+nav_group_id (FK→nav_groups), permission_id (FK→permissions)
+```
+
+**nav_item_permissions** (auth_db) — join table
+```
+nav_item_id (FK→nav_items), permission_id (FK→permissions)
 ```
 
 **Seeded groups:**
@@ -629,6 +670,24 @@ group_id (FK→groups), role_id (FK→roles)
 | rider | rider, user |
 | merchant | merchant, user |
 | admin | admin, merchant, rider, customer, user |
+
+**Seeded permissions (18):**
+| Module | Permissions |
+|--------|------------|
+| Auth | `auth.groups.view`, `auth.groups.manage`, `auth.roles.view`, `auth.roles.manage`, `auth.users.view`, `auth.users.manage` |
+| Catalog | `catalog.menus.view`, `catalog.menus.manage`, `catalog.ingredients.view`, `catalog.ingredients.manage` |
+| Kitchen | `kitchen.view`, `kitchen.manage` |
+| Order | `orders.view`, `orders.manage`, `orders.create`, `orders.queue.view` |
+| Inventory | `inventory.view`, `inventory.manage` |
+
+**Role → Permission mapping:**
+| Role | Permissions |
+|------|------------|
+| admin | all 18 |
+| merchant | catalog.*, kitchen.*, orders.view/manage/queue, inventory.* |
+| rider | orders.queue.view, orders.view |
+| customer | orders.create, orders.view |
+| user | (none) |
 
 **refresh_tokens** (auth_db)
 ```

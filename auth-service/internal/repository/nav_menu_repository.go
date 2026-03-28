@@ -24,11 +24,11 @@ func NewNavMenuRepository(db *gorm.DB) NavMenuRepository {
 func (r *navMenuRepository) ListAll() ([]model.NavGroup, error) {
 	var groups []model.NavGroup
 	err := r.db.
-		Preload("Roles").
+		Preload("Permissions").
 		Preload("Items", func(db *gorm.DB) *gorm.DB {
 			return db.Order("sort_order ASC")
 		}).
-		Preload("Items.Roles").
+		Preload("Items.Permissions").
 		Order("sort_order ASC").
 		Find(&groups).Error
 	return groups, err

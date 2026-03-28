@@ -292,8 +292,19 @@ func (s *authService) GetMenuConfig(userID uint) ([]model.NavGroupResponse, erro
 		allResponses[i] = g.ToResponse()
 	}
 
-	roles := user.Group.RoleNames()
-	return model.FilterNavMenuByRoles(allResponses, roles), nil
+	// Collect all permissions from user's roles
+	permSet := make(map[string]bool)
+	for _, role := range user.Group.Roles {
+		for _, perm := range role.Permissions {
+			permSet[perm.Name] = true
+		}
+	}
+	userPerms := make([]string, 0, len(permSet))
+	for p := range permSet {
+		userPerms = append(userPerms, p)
+	}
+
+	return model.FilterNavMenuByPermissions(allResponses, userPerms), nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
