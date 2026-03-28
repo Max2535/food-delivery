@@ -55,14 +55,53 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.refreshToken = (user as any).refreshToken;
         token.userId = user.id;
         token.roles = (user as any).roles;
+        return token;
       }
-      return token;
+
+      // Check if access token is still valid
+      const claims = parseJwtPayload((token.accessToken as string) ?? "");
+      const exp = claims.exp as number | undefined;
+      const now = Math.floor(Date.now() / 1000);
+
+      if (exp && now < exp) {
+        return token;
+      }
+
+      // Access token expired — try refresh
+      try {
+        const res = await fetch(`${API_URL}/v1/auth/refresh`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token.accessToken}`,
+          },
+          body: JSON.stringify({ refresh_token: token.refreshToken }),
+        });
+
+        if (!res.ok) {
+          return { ...token, error: "RefreshTokenError" as const };
+        }
+
+        const data = await res.json();
+        const newClaims = parseJwtPayload(data.access_token ?? "");
+
+        return {
+          ...token,
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token ?? token.refreshToken,
+          roles: (newClaims.roles as string[]) ?? token.roles,
+          error: undefined,
+        };
+      } catch {
+        return { ...token, error: "RefreshTokenError" as const };
+      }
     },
     async session({ session, token }) {
       (session as any).accessToken = token.accessToken;
       (session as any).refreshToken = token.refreshToken;
       (session as any).userId = token.userId;
       (session as any).roles = token.roles;
+      (session as any).error = token.error;
       return session;
     },
   },
