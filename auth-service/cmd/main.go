@@ -163,7 +163,8 @@ func main() {
 	emailVerifRepo := repository.NewEmailVerificationTokenRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	navMenuRepo := repository.NewNavMenuRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, emailVerifRepo, groupRepo, navMenuRepo)
+	emailSender := service.NewSmtpEmailSender()
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, emailVerifRepo, groupRepo, navMenuRepo, emailSender)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users

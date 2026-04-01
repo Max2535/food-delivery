@@ -28,13 +28,13 @@ services:
     container_name: order-service-api
     restart: always
     ports:
-      - "3000:3000"
+      - "3111:3000"
     environment:
       <<: *tz
       PORT: 3000
       DB_URL: postgres://admin:admin@db:5432/order_db?sslmode=disable
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      CONSUL_ADDRESS: consul:8500
+      CONSUL_ADDRESS: consul:8613
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
       db:
@@ -55,7 +55,7 @@ services:
       PORT: 3001
       DB_URL: postgres://admin:admin@db:5432/kitchen_db?sslmode=disable
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      CONSUL_ADDRESS: consul:8500
+      CONSUL_ADDRESS: consul:8613
       SERVICE_ADDRESS: kitchen-api
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
@@ -89,7 +89,7 @@ services:
     environment:
       <<: *tz
     ports:
-      - "5672:5672"
+      - "5662:5672"
       - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
@@ -104,7 +104,7 @@ services:
     environment:
       <<: *tz
     ports:
-      - "8500:8500"
+      - "8613:8500"
       - "8600:8600/tcp"
       - "8600:8600/udp"
     command: "agent -dev -client=0.0.0.0"
@@ -117,7 +117,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "8555:9090"
 
   grafana:
     image: grafana/grafana:latest
@@ -259,6 +259,11 @@ services:
       DB_URL: postgres://admin:admin@db:5432/auth_db?sslmode=disable
       PRIVATE_KEY_PATH: /app/private_key.pem
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_FROM: suppchai1992@gmail.com
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
     volumes:
       - ./private_key.pem:/app/private_key.pem
     depends_on:
@@ -276,7 +281,7 @@ services:
       - ./public_key.json:/etc/krakend/public_key.json
     ports:
       - "8080:8080"
-      - "9091:9091"
+      - "8091:9091"
     depends_on:
       - api
       - kitchen-api

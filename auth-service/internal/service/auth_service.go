@@ -53,10 +53,11 @@ type authService struct {
 	emailVerifRepo  repository.EmailVerificationTokenRepository
 	groupRepo       repository.GroupRepository
 	navMenuRepo     repository.NavMenuRepository
+	emailSender     EmailSender
 }
 
 func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, opts ...any) AuthService {
-	s := &authService{userRepo: userRepo, tokenRepo: tokenRepo}
+	s := &authService{userRepo: userRepo, tokenRepo: tokenRepo, emailSender: NewNoopEmailSender()}
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case repository.PasswordResetTokenRepository:
@@ -67,6 +68,8 @@ func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.Ref
 			s.groupRepo = v
 		case repository.NavMenuRepository:
 			s.navMenuRepo = v
+		case EmailSender:
+			s.emailSender = v
 		}
 	}
 	return s
@@ -112,6 +115,9 @@ func (s *authService) Register(username, password, email string) (*model.User, s
 	if err := s.emailVerifRepo.Create(vt); err != nil {
 		return nil, "", err
 	}
+
+	// Send verification email (best-effort; do not fail registration on email error)
+	_ = s.emailSender.SendVerificationEmail(user.Email, user.Username, rawToken)
 
 	return user, rawToken, nil
 }
@@ -164,6 +170,9 @@ func (s *authService) ResendVerificationEmail(email string) (string, error) {
 	if err := s.emailVerifRepo.Create(vt); err != nil {
 		return "", err
 	}
+
+	_ = s.emailSender.SendVerificationEmail(user.Email, user.Username, rawToken)
+
 	return rawToken, nil
 }
 
@@ -225,6 +234,9 @@ func (s *authService) ForgotPassword(email string) (string, error) {
 	if err := s.resetTokenRepo.Create(rt); err != nil {
 		return "", err
 	}
+
+	_ = s.emailSender.SendPasswordResetEmail(user.Email, user.Username, rawToken)
+
 	return rawToken, nil
 }
 

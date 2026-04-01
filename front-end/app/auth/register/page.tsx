@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -11,7 +11,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
@@ -36,9 +36,7 @@ export default function RegisterPage() {
         return;
       }
 
-      const data = await res.json().catch(() => null);
       const params = new URLSearchParams({ email });
-      if (data?.verify_token) params.set("token", data.verify_token);
       window.location.href = `/auth/verify-email?${params.toString()}`;
     } catch (error: any) {
       console.error("Registration error:", error);

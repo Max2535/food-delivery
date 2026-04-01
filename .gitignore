@@ -1,0 +1,6 @@
+# Environment variables (contains secrets — never commit)
+.env
+**/.env
+
+# Private keys
+private_key.pem

@@ -57,11 +57,12 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	log.Info().
 		Str("correlation_id", correlationID).
 		Uint("user_id", user.ID).
-		Str("verify_token", verifyToken).
-		Msg("user registered — email verification token generated (dev mode)")
+		Msg("user registered — verification email sent")
+
+	_ = verifyToken // token is sent via email; not exposed in response
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "registered successfully — please verify your email",
+		"message": "registered successfully — please check your email to verify your account",
 		"user": fiber.Map{
 			"id":       user.ID,
 			"username": user.Username,
@@ -69,7 +70,6 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			"group":    user.Group.Name,
 			"roles":    user.Group.RoleNames(),
 		},
-		"verify_token": verifyToken, // TODO: remove when real email service is added
 	})
 }
 
@@ -299,16 +299,15 @@ func (h *AuthHandler) ForgotPassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
-	// ในระบบจริงจะส่ง email — ตอนนี้ log token สำหรับ development
 	log.Info().
 		Str("correlation_id", correlationID).
-		Str("reset_token", token).
 		Str("email", req.Email).
-		Msg("password reset token generated (dev mode — would send email in production)")
+		Msg("password reset email sent")
+
+	_ = token
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":     "if the email exists, a reset link has been sent",
-		"reset_token": token, // TODO: ลบออกเมื่อมี email service จริง
+		"message": "if the email exists, a reset link has been sent",
 	})
 }
 
@@ -728,12 +727,12 @@ func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 	log.Info().
 		Str("correlation_id", correlationID).
 		Str("email", req.Email).
-		Str("verify_token", token).
-		Msg("verification email resent (dev mode)")
+		Msg("verification email resent")
+
+	_ = token
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":      "if the email exists and is unverified, a new token has been sent",
-		"verify_token": token, // TODO: remove when real email service is added
+		"message": "if the email exists and is unverified, a new token has been sent",
 	})
 }
 
