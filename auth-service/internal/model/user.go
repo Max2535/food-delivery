@@ -12,11 +12,12 @@ const (
 
 type User struct {
 	gorm.Model
-	Username string `gorm:"uniqueIndex;not null" json:"username"`
-	Password string `gorm:"not null" json:"-"`
-	Email    string `gorm:"uniqueIndex;not null" json:"email"`
-	GroupID  uint   `gorm:"not null" json:"group_id"`
-	Group    Group  `gorm:"foreignKey:GroupID" json:"group"`
+	Username   string `gorm:"uniqueIndex;not null" json:"username"`
+	Password   string `gorm:"not null" json:"-"`
+	Email      string `gorm:"uniqueIndex;not null" json:"email"`
+	GroupID    uint   `gorm:"not null" json:"group_id"`
+	Group      Group  `gorm:"foreignKey:GroupID" json:"group"`
+	IsVerified bool   `gorm:"default:true" json:"is_verified"`
 }
 
 type TokenPair struct {

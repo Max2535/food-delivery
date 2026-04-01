@@ -36,7 +36,10 @@ export default function RegisterPage() {
         return;
       }
 
-      window.location.href = "/auth/login";
+      const data = await res.json().catch(() => null);
+      const params = new URLSearchParams({ email });
+      if (data?.verify_token) params.set("token", data.verify_token);
+      window.location.href = `/auth/verify-email?${params.toString()}`;
     } catch (error: any) {
       console.error("Registration error:", error);
       setError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");

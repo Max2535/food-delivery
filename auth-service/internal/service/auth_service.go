@@ -23,10 +23,11 @@ var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrGroupExists        = errors.New("group name already exists")
 	ErrGroupNotFound      = errors.New("group not found")
+	ErrEmailNotVerified   = errors.New("email not verified")
 )
 
 type AuthService interface {
-	Register(username, password, email string) (*model.User, error)
+	Register(username, password, email string) (*model.User, string, error)
 	Login(username, password string) (*model.TokenPair, error)
 	Refresh(refreshToken string) (*model.TokenPair, error)
 	Logout(refreshToken string) error
@@ -35,6 +36,8 @@ type AuthService interface {
 	ChangePassword(userID uint, currentPassword, newPassword string) error
 	ForgotPassword(email string) (string, error)
 	ResetPassword(token, newPassword string) error
+	VerifyEmail(token string) error
+	ResendVerificationEmail(email string) (string, error)
 	ListGroups() ([]*model.Group, error)
 	ListRoles() ([]*model.Role, error)
 	CreateGroup(name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
@@ -44,11 +47,12 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo       repository.UserRepository
-	tokenRepo      repository.RefreshTokenRepository
-	resetTokenRepo repository.PasswordResetTokenRepository
-	groupRepo      repository.GroupRepository
-	navMenuRepo    repository.NavMenuRepository
+	userRepo        repository.UserRepository
+	tokenRepo       repository.RefreshTokenRepository
+	resetTokenRepo  repository.PasswordResetTokenRepository
+	emailVerifRepo  repository.EmailVerificationTokenRepository
+	groupRepo       repository.GroupRepository
+	navMenuRepo     repository.NavMenuRepository
 }
 
 func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.RefreshTokenRepository, opts ...any) AuthService {
@@ -57,6 +61,8 @@ func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.Ref
 		switch v := opt.(type) {
 		case repository.PasswordResetTokenRepository:
 			s.resetTokenRepo = v
+		case repository.EmailVerificationTokenRepository:
+			s.emailVerifRepo = v
 		case repository.GroupRepository:
 			s.groupRepo = v
 		case repository.NavMenuRepository:
@@ -66,31 +72,48 @@ func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.Ref
 	return s
 }
 
-func (s *authService) Register(username, password, email string) (*model.User, error) {
+func (s *authService) Register(username, password, email string) (*model.User, string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	group, err := s.groupRepo.FindByName(model.GroupUser)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	user := &model.User{
-		Username: username,
-		Password: string(hashed),
-		Email:    email,
-		GroupID:  group.ID,
-		Group:    *group,
+		Username:   username,
+		Password:   string(hashed),
+		Email:      email,
+		GroupID:    group.ID,
+		Group:      *group,
+		IsVerified: false,
 	}
 	if err := s.userRepo.Create(user); err != nil {
 		if isDuplicateError(err) {
-			return nil, ErrUserExists
+			return nil, "", ErrUserExists
 		}
-		return nil, err
+		return nil, "", err
 	}
-	return user, nil
+
+	// Generate email verification token
+	rawToken, err := generateRandomToken()
+	if err != nil {
+		return nil, "", err
+	}
+	_ = s.emailVerifRepo.DeleteByUserID(user.ID)
+	vt := &model.EmailVerificationToken{
+		UserID:    user.ID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	if err := s.emailVerifRepo.Create(vt); err != nil {
+		return nil, "", err
+	}
+
+	return user, rawToken, nil
 }
 
 func (s *authService) Login(username, password string) (*model.TokenPair, error) {
@@ -101,7 +124,47 @@ func (s *authService) Login(username, password string) (*model.TokenPair, error)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
+	if !user.IsVerified {
+		return nil, ErrEmailNotVerified
+	}
 	return s.issuePair(user)
+}
+
+func (s *authService) VerifyEmail(token string) error {
+	hash := hashToken(token)
+	vt, err := s.emailVerifRepo.FindByTokenHash(hash)
+	if err != nil || vt.IsExpired() {
+		return ErrInvalidToken
+	}
+	if err := s.userRepo.UpdateIsVerified(vt.UserID, true); err != nil {
+		return err
+	}
+	_ = s.emailVerifRepo.DeleteByTokenHash(hash)
+	return nil
+}
+
+func (s *authService) ResendVerificationEmail(email string) (string, error) {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		return "", ErrUserNotFound
+	}
+	if user.IsVerified {
+		return "", nil
+	}
+	_ = s.emailVerifRepo.DeleteByUserID(user.ID)
+	rawToken, err := generateRandomToken()
+	if err != nil {
+		return "", err
+	}
+	vt := &model.EmailVerificationToken{
+		UserID:    user.ID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	if err := s.emailVerifRepo.Create(vt); err != nil {
+		return "", err
+	}
+	return rawToken, nil
 }
 
 func (s *authService) Refresh(refreshToken string) (*model.TokenPair, error) {

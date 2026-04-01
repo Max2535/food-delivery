@@ -10,12 +10,12 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-func (m *MockAuthService) Register(username, password, email string) (*model.User, error) {
+func (m *MockAuthService) Register(username, password, email string) (*model.User, string, error) {
 	args := m.Called(username, password, email)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, "", args.Error(2)
 	}
-	return args.Get(0).(*model.User), args.Error(1)
+	return args.Get(0).(*model.User), args.String(1), args.Error(2)
 }
 
 func (m *MockAuthService) Login(username, password string) (*model.TokenPair, error) {
@@ -65,6 +65,16 @@ func (m *MockAuthService) ForgotPassword(email string) (string, error) {
 func (m *MockAuthService) ResetPassword(token, newPassword string) error {
 	args := m.Called(token, newPassword)
 	return args.Error(0)
+}
+
+func (m *MockAuthService) VerifyEmail(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ResendVerificationEmail(email string) (string, error) {
+	args := m.Called(email)
+	return args.String(0), args.Error(1)
 }
 
 func (m *MockAuthService) ListGroups() ([]*model.Group, error) {

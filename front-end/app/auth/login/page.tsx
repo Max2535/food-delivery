@@ -24,6 +24,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
+      if (res.error.includes("EMAIL_NOT_VERIFIED")) {
+        window.location.href = `/auth/verify-email`;
+        return;
+      }
       setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
       return;
     }

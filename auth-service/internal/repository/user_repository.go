@@ -13,6 +13,7 @@ type UserRepository interface {
 	FindByIDs(ids []uint) ([]model.User, error)
 	UpdatePassword(id uint, hashedPassword string) error
 	UpdateGroupID(userIDs []uint, groupID uint) error
+	UpdateIsVerified(id uint, isVerified bool) error
 }
 
 type userRepository struct {
@@ -59,4 +60,10 @@ func (r *userRepository) UpdatePassword(id uint, hashedPassword string) error {
 	return r.db.Model(&model.User{}).
 		Where("id = ?", id).
 		Update("password", hashedPassword).Error
+}
+
+func (r *userRepository) UpdateIsVerified(id uint, isVerified bool) error {
+	return r.db.Model(&model.User{}).
+		Where("id = ?", id).
+		Update("is_verified", isVerified).Error
 }

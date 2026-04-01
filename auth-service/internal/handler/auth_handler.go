@@ -45,7 +45,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
 	}
 
-	user, err := h.authService.Register(req.Username, req.Password, req.Email)
+	user, verifyToken, err := h.authService.Register(req.Username, req.Password, req.Email)
 	if err != nil {
 		if errors.Is(err, service.ErrUserExists) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
@@ -54,9 +54,14 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
-	log.Info().Str("correlation_id", correlationID).Uint("user_id", user.ID).Msg("user registered")
+	log.Info().
+		Str("correlation_id", correlationID).
+		Uint("user_id", user.ID).
+		Str("verify_token", verifyToken).
+		Msg("user registered — email verification token generated (dev mode)")
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "registered successfully",
+		"message": "registered successfully — please verify your email",
 		"user": fiber.Map{
 			"id":       user.ID,
 			"username": user.Username,
@@ -64,6 +69,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			"group":    user.Group.Name,
 			"roles":    user.Group.RoleNames(),
 		},
+		"verify_token": verifyToken, // TODO: remove when real email service is added
 	})
 }
 
@@ -92,6 +98,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid username or password"})
+		}
+		if errors.Is(err, service.ErrEmailNotVerified) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "email not verified", "code": "EMAIL_NOT_VERIFIED"})
 		}
 		log.Error().Str("correlation_id", correlationID).Err(err).Msg("login failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
@@ -659,6 +668,73 @@ func (h *AuthHandler) GetMenuConfig(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"menu": menu})
+}
+
+// VerifyEmail godoc
+// @Summary      Verify email address
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{token=string} true "Verification token"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Failure      401  {object}  object{error=string}
+// @Router       /api/v1/auth/verify-email [post]
+func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token is required"})
+	}
+
+	if err := h.authService.VerifyEmail(req.Token); err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid or expired verification token"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("verify email failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Msg("email verified")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "email verified successfully"})
+}
+
+// ResendVerificationEmail godoc
+// @Summary      Resend email verification token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body object{email=string} true "Email address"
+// @Success      200  {object}  object{message=string}
+// @Failure      400  {object}  object{error=string}
+// @Router       /api/v1/auth/resend-verification [post]
+func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email is required"})
+	}
+
+	token, err := h.authService.ResendVerificationEmail(req.Email)
+	if err != nil {
+		// Do not reveal whether the email exists
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "if the email exists and is unverified, a new token has been sent"})
+	}
+
+	log.Info().
+		Str("correlation_id", correlationID).
+		Str("email", req.Email).
+		Str("verify_token", token).
+		Msg("verification email resent (dev mode)")
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":      "if the email exists and is unverified, a new token has been sent",
+		"verify_token": token, // TODO: remove when real email service is added
+	})
 }
 
 // ── Helper ───────────────────────────────────────────────────────

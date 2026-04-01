@@ -15,11 +15,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository, *repository.MockGroupRepository) {
+func newSvc() (AuthService, *repository.MockUserRepository, *repository.MockRefreshTokenRepository, *repository.MockGroupRepository, *repository.MockEmailVerificationTokenRepository) {
 	userRepo := new(repository.MockUserRepository)
 	tokenRepo := new(repository.MockRefreshTokenRepository)
 	groupRepo := new(repository.MockGroupRepository)
-	return NewAuthService(userRepo, tokenRepo, groupRepo), userRepo, tokenRepo, groupRepo
+	emailVerifRepo := new(repository.MockEmailVerificationTokenRepository)
+	return NewAuthService(userRepo, tokenRepo, groupRepo, emailVerifRepo), userRepo, tokenRepo, groupRepo, emailVerifRepo
 }
 
 func userGroup() model.Group {
@@ -42,26 +43,30 @@ func hashRaw(raw string) string {
 // ── Register ─────────────────────────────────────────────────────────────────
 
 func TestAuthService_Register_Success(t *testing.T) {
-	svc, userRepo, _, groupRepo := newSvc()
+	svc, userRepo, _, groupRepo, emailVerifRepo := newSvc()
 
 	group := userGroup()
 	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
 	userRepo.On("Create", mock.MatchedBy(func(u *model.User) bool {
 		return u.Username == "alice" && u.Email == "alice@example.com" && u.GroupID == group.ID
 	})).Return(nil).Once()
+	emailVerifRepo.On("DeleteByUserID", mock.AnythingOfType("uint")).Return(nil).Once()
+	emailVerifRepo.On("Create", mock.Anything).Return(nil).Once()
 
-	user, err := svc.Register("alice", "password123", "alice@example.com")
+	user, token, err := svc.Register("alice", "password123", "alice@example.com")
 
 	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
 	assert.Equal(t, "alice", user.Username)
 	assert.Equal(t, model.GroupUser, user.Group.Name)
 	assert.Equal(t, []string{model.RoleUser}, user.Group.RoleNames())
 	userRepo.AssertExpectations(t)
 	groupRepo.AssertExpectations(t)
+	emailVerifRepo.AssertExpectations(t)
 }
 
 func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
-	svc, userRepo, _, groupRepo := newSvc()
+	svc, userRepo, _, groupRepo, emailVerifRepo := newSvc()
 
 	group := userGroup()
 	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
@@ -71,6 +76,8 @@ func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
 		captured = u
 		return true
 	})).Return(nil).Once()
+	emailVerifRepo.On("DeleteByUserID", mock.AnythingOfType("uint")).Return(nil).Once()
+	emailVerifRepo.On("Create", mock.Anything).Return(nil).Once()
 
 	svc.Register("bob", "plaintext", "bob@example.com")
 
@@ -79,13 +86,13 @@ func TestAuthService_Register_PasswordIsHashed(t *testing.T) {
 }
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
-	svc, userRepo, _, groupRepo := newSvc()
+	svc, userRepo, _, groupRepo, _ := newSvc()
 
 	group := userGroup()
 	groupRepo.On("FindByName", model.GroupUser).Return(&group, nil).Once()
 	userRepo.On("Create", mock.Anything).Return(errors.New("duplicate key")).Once()
 
-	_, err := svc.Register("alice", "password123", "alice@example.com")
+	_, _, err := svc.Register("alice", "password123", "alice@example.com")
 
 	assert.ErrorIs(t, err, ErrUserExists)
 	userRepo.AssertExpectations(t)
@@ -95,11 +102,11 @@ func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 
 func TestAuthService_Login_Success(t *testing.T) {
 	os.Setenv("PRIVATE_KEY_PATH", "../../../private_key.pem")
-	svc, userRepo, tokenRepo, _ := newSvc()
+	svc, userRepo, tokenRepo, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.DefaultCost)
 	group := userGroup()
-	user := &model.User{Username: "alice", Password: string(hashed), GroupID: group.ID, Group: group}
+	user := &model.User{Username: "alice", Password: string(hashed), GroupID: group.ID, Group: group, IsVerified: true}
 	user.ID = 1
 
 	userRepo.On("FindByUsername", "alice").Return(user, nil).Once()
@@ -115,7 +122,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 }
 
 func TestAuthService_Login_UserNotFound(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	userRepo.On("FindByUsername", "ghost").Return(nil, errors.New("not found")).Once()
 
@@ -127,7 +134,7 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
 	user := &model.User{Username: "alice", Password: string(hashed)}
@@ -144,7 +151,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 
 func TestAuthService_Refresh_Success(t *testing.T) {
 	os.Setenv("PRIVATE_KEY_PATH", "../../../private_key.pem")
-	svc, _, tokenRepo, _ := newSvc()
+	svc, _, tokenRepo, _, _ := newSvc()
 
 	rawToken := "validrawtoken123"
 	hash := hashRaw(rawToken)
@@ -171,7 +178,7 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 }
 
 func TestAuthService_Refresh_TokenNotFound(t *testing.T) {
-	svc, _, tokenRepo, _ := newSvc()
+	svc, _, tokenRepo, _, _ := newSvc()
 
 	tokenRepo.On("FindByTokenHash", mock.Anything).Return(nil, errors.New("not found")).Once()
 
@@ -183,7 +190,7 @@ func TestAuthService_Refresh_TokenNotFound(t *testing.T) {
 }
 
 func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
-	svc, _, tokenRepo, _ := newSvc()
+	svc, _, tokenRepo, _, _ := newSvc()
 
 	rawToken := "expiredtoken"
 	hash := hashRaw(rawToken)
@@ -203,7 +210,7 @@ func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
 // ── Logout ────────────────────────────────────────────────────────────────────
 
 func TestAuthService_Logout_Success(t *testing.T) {
-	svc, _, tokenRepo, _ := newSvc()
+	svc, _, tokenRepo, _, _ := newSvc()
 
 	rawToken := "sometoken"
 	hash := hashRaw(rawToken)
@@ -218,7 +225,7 @@ func TestAuthService_Logout_Success(t *testing.T) {
 // ── LogoutAll ─────────────────────────────────────────────────────────────────
 
 func TestAuthService_LogoutAll_Success(t *testing.T) {
-	svc, _, tokenRepo, _ := newSvc()
+	svc, _, tokenRepo, _, _ := newSvc()
 
 	tokenRepo.On("DeleteByUserID", uint(42)).Return(nil).Once()
 
@@ -231,7 +238,7 @@ func TestAuthService_LogoutAll_Success(t *testing.T) {
 // ── GetProfile ────────────────────────────────────────────────────────────────
 
 func TestAuthService_GetProfile_Success(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	expected := &model.User{Username: "alice", Email: "alice@example.com"}
 	expected.ID = 1
@@ -245,7 +252,7 @@ func TestAuthService_GetProfile_Success(t *testing.T) {
 }
 
 func TestAuthService_GetProfile_NotFound(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	userRepo.On("FindByID", uint(99)).Return(nil, errors.New("not found")).Once()
 
@@ -259,7 +266,7 @@ func TestAuthService_GetProfile_NotFound(t *testing.T) {
 // ── ChangePassword ────────────────────────────────────────────────────────────
 
 func TestAuthService_ChangePassword_Success(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("old"), bcrypt.DefaultCost)
 	user := &model.User{Password: string(hashed)}
@@ -275,7 +282,7 @@ func TestAuthService_ChangePassword_Success(t *testing.T) {
 }
 
 func TestAuthService_ChangePassword_WrongCurrentPassword(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
 	user := &model.User{Password: string(hashed)}
@@ -290,7 +297,7 @@ func TestAuthService_ChangePassword_WrongCurrentPassword(t *testing.T) {
 }
 
 func TestAuthService_ChangePassword_UserNotFound(t *testing.T) {
-	svc, userRepo, _, _ := newSvc()
+	svc, userRepo, _, _, _ := newSvc()
 
 	userRepo.On("FindByID", uint(99)).Return(nil, errors.New("not found")).Once()
 

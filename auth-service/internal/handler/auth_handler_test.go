@@ -46,7 +46,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	app.Post("/register", NewAuthHandler(mockSvc).Register)
 
 	mockSvc.On("Register", "alice", "password123", "alice@example.com").
-		Return(&model.User{Username: "alice", Email: "alice@example.com", GroupID: 1, Group: model.Group{Name: "user", Roles: []model.Role{{Name: "user"}}}}, nil)
+		Return(&model.User{Username: "alice", Email: "alice@example.com", GroupID: 1, Group: model.Group{Name: "user", Roles: []model.Role{{Name: "user"}}}}, "tok123", nil)
 
 	resp, _ := app.Test(newReq("POST", "/register", jsonBody(map[string]string{
 		"username": "alice", "password": "password123", "email": "alice@example.com",
@@ -82,7 +82,7 @@ func TestAuthHandler_Register_DuplicateUser(t *testing.T) {
 	app.Post("/register", NewAuthHandler(mockSvc).Register)
 
 	mockSvc.On("Register", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, service.ErrUserExists)
+		Return(nil, "", service.ErrUserExists)
 
 	resp, _ := app.Test(newReq("POST", "/register", jsonBody(map[string]string{
 		"username": "alice", "password": "password123", "email": "alice@example.com",

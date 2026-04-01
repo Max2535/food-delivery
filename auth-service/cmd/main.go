@@ -59,7 +59,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not connect to database")
 	}
 
-	if err := db.AutoMigrate(&model.Permission{}, &model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}, &model.NavGroup{}, &model.NavItem{}); err != nil {
+	if err := db.AutoMigrate(&model.Permission{}, &model.Role{}, &model.Group{}, &model.User{}, &model.RefreshToken{}, &model.PasswordResetToken{}, &model.EmailVerificationToken{}, &model.NavGroup{}, &model.NavItem{}); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto migrate")
 	}
 
@@ -160,9 +160,10 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	resetTokenRepo := repository.NewPasswordResetTokenRepository(db)
+	emailVerifRepo := repository.NewEmailVerificationTokenRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	navMenuRepo := repository.NewNavMenuRepository(db)
-	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, groupRepo, navMenuRepo)
+	authSvc := service.NewAuthService(userRepo, tokenRepo, resetTokenRepo, emailVerifRepo, groupRepo, navMenuRepo)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	// Seed test users
@@ -173,16 +174,22 @@ func main() {
 		// {"validuser", "validpassword", "validuser@example.com"},
 	}
 	for _, u := range testUsers {
-		user, err := authSvc.Register(u.username, u.password, u.email)
+		user, _, err := authSvc.Register(u.username, u.password, u.email)
 		if err != nil {
 			log.Warn().Err(err).Str("username", u.username).Msg("Could not seed user (may already exist)")
+			// Mark existing seed users as verified in case they were created before this migration
+			var existing model.User
+			if dbErr := db.Where("username = ?", u.username).First(&existing).Error; dbErr == nil && !existing.IsVerified {
+				db.Model(&existing).Update("is_verified", true)
+			}
 			continue
 		}
-		// Assign admin group
+		// Assign admin group and mark verified (seed users skip email verification)
 		adminGroup := model.Group{}
 		if err := db.Where("name = ?", model.GroupAdmin).Preload("Roles").First(&adminGroup).Error; err == nil {
 			user.GroupID = adminGroup.ID
 			user.Group = adminGroup
+			user.IsVerified = true
 			db.Save(user)
 			log.Info().Str("username", u.username).Str("group", model.GroupAdmin).Msg("Seeded user with admin group")
 		} else {
@@ -216,6 +223,8 @@ func main() {
 	auth.Put("/password", authHandler.ChangePassword)
 	auth.Post("/forgot-password", authHandler.ForgotPassword)
 	auth.Post("/reset-password", authHandler.ResetPassword)
+	auth.Post("/verify-email", authHandler.VerifyEmail)
+	auth.Post("/resend-verification", authHandler.ResendVerificationEmail)
 	auth.Get("/groups", authHandler.ListGroups)
 	auth.Post("/group", authHandler.CreateGroup)
 	auth.Put("/group", authHandler.UpdateGroup)

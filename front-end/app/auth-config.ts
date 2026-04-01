@@ -31,7 +31,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           body: JSON.stringify({ username, password }),
         });
 
-        if (!res.ok) return null;
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body?.code === "EMAIL_NOT_VERIFIED") {
+            throw new Error("EMAIL_NOT_VERIFIED");
+          }
+          return null;
+        }
 
         const data = await res.json();
 
