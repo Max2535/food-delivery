@@ -52,7 +52,7 @@ Observability:
 | Service | Port | Responsibility |
 |---------|------|----------------|
 | API Gateway (KrakenD) | 8080 | Routing, JWT validation, rate limiting |
-| Auth Service | 3002 | User registration, login, JWT issuance, refresh tokens, profile, password management, password reset, group-based roles, permissions, dynamic nav menu |
+| Auth Service | 3002 | User registration, email verification, login, JWT issuance, refresh tokens, profile, password management, password reset, group-based roles, permissions, dynamic nav menu |
 | Order Service | 3000 | Order CRUD, publishes order events |
 | Kitchen Service | 3001 | Kitchen ticket management, consumes order events |
 | Kitchen Worker | — | RabbitMQ consumer (separate process) |
@@ -81,6 +81,18 @@ Observability:
 
 - [Docker](https://docs.docker.com/get-docker/) & Docker Compose
 - Go 1.24+ (for local development only)
+
+### Configure Environment
+
+Create `.env` at the project root before starting (required for email sending):
+
+```env
+# Gmail App Password — Google Account → Security → App passwords
+SMTP_PASSWORD=xxxx xxxx xxxx xxxx
+
+# Base URL used in email links
+SITE_URL=http://localhost:3000
+```
 
 ### Run with Docker Compose
 
@@ -121,11 +133,28 @@ All requests go through the API Gateway at `http://localhost:8080`.
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username": "john", "password": "secret123", "email": "john@example.com"}'
-# Response: {"message":"registered successfully","user":{"id":1,"username":"john","email":"john@example.com","group":"user","roles":["user"]}}
+# Sends a verification email to john@example.com
+# Response: {"message":"registered successfully — please check your email to verify your account","user":{...}}
+```
+
+#### Verify Email
+```bash
+# Token arrives via email link: /auth/verify-email?token=<token>
+curl -X POST http://localhost:8080/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token": "<token_from_email>"}'
+```
+
+#### Resend Verification Email
+```bash
+curl -X POST http://localhost:8080/v1/auth/resend-verification \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com"}'
 ```
 
 #### Login (returns access_token + refresh_token)
 ```bash
+# Returns 403 with {"error":"email not verified","code":"EMAIL_NOT_VERIFIED"} if not verified
 TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "john", "password": "secret123"}' | jq -r .access_token)
@@ -165,17 +194,17 @@ curl -X POST http://localhost:8080/v1/auth/logout-all \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-#### Forgot Password (request reset token)
+#### Forgot Password
 ```bash
+# Sends a reset link to the email (expires 15 min)
 curl -X POST http://localhost:8080/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email": "john@example.com"}'
-# Dev mode: returns reset_token in response body
-# Production: integrate email service to send token via email
 ```
 
-#### Reset Password (using reset token)
+#### Reset Password
 ```bash
+# Token arrives via email link: /auth/reset-password?token=<token>
 curl -X POST http://localhost:8080/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"token": "<reset_token>", "new_password": "newsecret123"}'
@@ -436,7 +465,10 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 - **JWT algorithm:** RS256 (RSA 2048-bit)
 - **Access token expiry:** 24 hours
 - **Refresh token expiry:** 7 days (stored as SHA-256 hash in DB)
+- **Email verification token expiry:** 24 hours (stored as SHA-256 hash in DB)
 - **Password reset token expiry:** 15 minutes (stored as SHA-256 hash in DB)
+- **Unverified users:** Cannot login — `POST /v1/auth/login` returns `403 EMAIL_NOT_VERIFIED`
+- **Email delivery:** Gmail SMTP (smtp.gmail.com:587, STARTTLS). Requires `SMTP_PASSWORD` (Gmail App Password) in `.env`
 - **Token validation:** Performed at gateway level before requests reach backend services
 - **Refresh flow:** Client sends refresh_token → Auth Service rotates (delete old, issue new pair)
 - **Password reset flow:** Request token via email → validate token → set new password → revoke all refresh tokens
@@ -451,6 +483,11 @@ Correlation ID is passed via RabbitMQ message `CorrelationId` header for end-to-
 PORT=3002
 DB_URL=postgres://admin:admin@db:5432/auth_db?sslmode=disable
 PRIVATE_KEY_PATH=/app/private_key.pem
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_FROM=suppchai1992@gmail.com
+SMTP_PASSWORD=<gmail-app-password>   # set via root .env
+SITE_URL=http://localhost:3000       # set via root .env
 ```
 
 ### Order Service
@@ -525,16 +562,15 @@ The frontend is a Next.js application located in `front-end/`. It provides:
 | Page | Path | Description |
 |------|------|-------------|
 | Login | `/auth/login` | Username/password login via NextAuth.js |
-| Register | `/auth/register` | New user registration |
-| Forgot Password | `/auth/forgot-password` | Request password reset token by email |
+| Register | `/auth/register` | New user registration — redirects to verify-email on success |
+| Verify Email | `/auth/verify-email` | Enter/paste verification token from email; resend link included |
+| Forgot Password | `/auth/forgot-password` | Request password reset link by email |
 | Reset Password | `/auth/reset-password` | Set new password using reset token (supports `?token=` URL param) |
 | Dashboard | `/dashboard` | Protected page (requires authentication) |
 
 The navigation menu is **dynamic and permission-based** — the navbar fetches `GET /api/auth/menu-config` on login, which returns only the menu items the user is allowed to see based on their role permissions.
 
 API proxy routes (`app/api/auth/`) forward requests to the backend Auth Service.
-
-> **Dev mode note:** The forgot-password endpoint returns the `reset_token` in the response body. Remove this field when integrating a real email service.
 
 ## Project Structure
 
@@ -545,7 +581,7 @@ food-delivery/
 │   └── internal/
 │       ├── handler/        # HTTP handlers
 │       ├── middleware/      # Logger
-│       ├── model/           # User, Group, Role, Permission, NavGroup, NavItem, RefreshToken, PasswordResetToken
+│       ├── model/           # User, Group, Role, Permission, NavGroup, NavItem, RefreshToken, PasswordResetToken, EmailVerificationToken
 │       ├── repository/      # Database layer
 │       └── service/         # JWT generation, business logic
 ├── order-service/
@@ -580,8 +616,8 @@ food-delivery/
 │       └── service/         # Business logic (7 services)
 ├── front-end/
 │   ├── app/
-│   │   ├── api/auth/        # API proxy routes (NextAuth, forgot/reset password)
-│   │   ├── auth/            # Auth pages (login, register, forgot/reset password)
+│   │   ├── api/auth/        # API proxy routes (NextAuth, register, verify-email, resend-verification, forgot/reset password)
+│   │   ├── auth/            # Auth pages (login, register, verify-email, forgot/reset password)
 │   │   └── dashboard/       # Protected dashboard page
 │   ├── middleware.ts         # NextAuth middleware
 │   └── package.json
@@ -614,7 +650,7 @@ Tables are auto-migrated by GORM on service startup.
 
 **users** (auth_db)
 ```
-id, username (unique), password (bcrypt), email (unique), group_id (FK→groups), created_at, updated_at, deleted_at
+id, username (unique), password (bcrypt), email (unique), group_id (FK→groups), is_verified (bool, default false), created_at, updated_at, deleted_at
 ```
 
 **groups** (auth_db)
@@ -697,6 +733,11 @@ id, user_id (FK→users), token_hash (unique, SHA-256), expires_at, created_at
 **password_reset_tokens** (auth_db)
 ```
 id, user_id (FK→users), token_hash (unique, SHA-256), expires_at (15 min), created_at
+```
+
+**email_verification_tokens** (auth_db)
+```
+id, user_id (FK→users), token_hash (unique, SHA-256), expires_at (24 h), created_at
 ```
 
 **orders** (order_db)
@@ -782,7 +823,7 @@ docker-compose up -d --build auth-service
 
 ### Run Unit Tests
 ```bash
-# Auth Service (39 tests — handler + service layers)
+# Auth Service — handler + service layers
 cd auth-service && go test ./internal/... -v
 ```
 

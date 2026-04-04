@@ -10,8 +10,8 @@ Microservices-based food delivery backend written in Go. Five main services (aut
 
 ```
 food-delivery/
-├── auth-service/        # JWT issuance, user management, password reset
-├── front-end/           # Next.js frontend (login, register, forgot/reset password, dashboard)
+├── auth-service/        # JWT issuance, user management, email verification, password reset
+├── front-end/           # Next.js frontend (login, register, verify-email, forgot/reset password, dashboard)
 ├── order-service/       # Order CRUD + RabbitMQ publisher
 ├── kitchen-service/     # Kitchen tickets + RabbitMQ consumer worker
 ├── catalog-service/     # Master data: menus, BOM, add-ons, portions, stations
@@ -119,7 +119,7 @@ User (group_id FK) → Group ←M2M→ Role ←M2M→ Permission
 | customer | orders.create, orders.view |
 | user | (none) |
 
-New users registered via `/v1/auth/register` are assigned to the `user` group by default.
+New users registered via `/v1/auth/register` are assigned to the `user` group by default and must verify their email before they can login (`is_verified = false` until verified).
 
 **JWT claims example:**
 ```json
@@ -148,14 +148,16 @@ Menu config is seeded on service startup but can be modified via database withou
 **Auth endpoints:**
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/v1/auth/register` | POST | No | Register new user |
-| `/v1/auth/login` | POST | No | Login, returns access_token + refresh_token |
+| `/v1/auth/register` | POST | No | Register new user — sends verification email, returns 201 |
+| `/v1/auth/login` | POST | No | Login — returns 403 `EMAIL_NOT_VERIFIED` if not verified, else access_token + refresh_token |
+| `/v1/auth/verify-email` | POST | No | Verify email using token from email link (expires 24 h) |
+| `/v1/auth/resend-verification` | POST | No | Resend email verification link |
 | `/v1/auth/refresh` | POST | No | Refresh access token using refresh_token |
 | `/v1/auth/logout` | POST | No | Revoke a specific refresh token |
 | `/v1/auth/logout-all` | POST | JWT | Revoke all refresh tokens for user |
 | `/v1/auth/profile` | GET | JWT | Get current user profile |
 | `/v1/auth/password` | PUT | JWT | Change password |
-| `/v1/auth/forgot-password` | POST | No | Request password reset token (returns token in dev mode) |
+| `/v1/auth/forgot-password` | POST | No | Request password reset — sends reset link via email (expires 15 min) |
 | `/v1/auth/reset-password` | POST | No | Reset password using token (revokes all refresh tokens) |
 | `/v1/auth/menu-config` | GET | JWT | Get navigation menu filtered by user permissions |
 
@@ -295,7 +297,15 @@ If rotating RSA keys:
 PORT=3002
 DB_URL=postgres://admin:admin@db:5432/auth_db?sslmode=disable
 PRIVATE_KEY_PATH=/app/private_key.pem
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_FROM=suppchai1992@gmail.com
+SMTP_PASSWORD=<gmail-app-password>
+SITE_URL=http://localhost:3000
 ```
+
+`SMTP_PASSWORD` is a Gmail App Password (not the account password). Requires 2-Step Verification to be enabled.
+Set via `.env` at project root for docker-compose, or `auth-service/.env` for local dev.
 
 ### Order Service
 ```
@@ -340,26 +350,36 @@ cd auth-service
 go test ./internal/... -v
 ```
 
-Test coverage: Register, Login, Refresh, Logout, LogoutAll, GetProfile, ChangePassword — both success and error cases (39 tests).
+Test coverage: Register, Login, Refresh, Logout, LogoutAll, GetProfile, ChangePassword — both success and error cases.
 
 ### Manual Testing Flow
 
 ```bash
-# 1. Register
+# 1. Register (triggers verification email to t@t.com)
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"test","password":"testpass1","email":"t@t.com"}'
 
-# 2. Login (returns access_token + refresh_token)
+# 2. Verify email (token arrives in email, link: /auth/verify-email?token=<token>)
+curl -X POST http://localhost:8080/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token_from_email>"}'
+
+# 3. Resend verification email if needed
+curl -X POST http://localhost:8080/v1/auth/resend-verification \
+  -H "Content-Type: application/json" \
+  -d '{"email":"t@t.com"}'
+
+# 4. Login (returns access_token + refresh_token; 403 if email not verified)
 TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"test","password":"testpass1"}' | jq -r .access_token)
 
-# 3. Get profile (JWT required)
+# 5. Get profile (JWT required)
 curl http://localhost:8080/v1/auth/profile \
   -H "Authorization: Bearer $TOKEN"
 
-# 4. Refresh token
+# 6. Refresh token
 REFRESH=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"test","password":"testpass1"}' | jq -r .refresh_token)
@@ -367,45 +387,45 @@ curl -X POST http://localhost:8080/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d "{\"refresh_token\":\"$REFRESH\"}"
 
-# 5. Change password (JWT required)
+# 7. Change password (JWT required)
 curl -X PUT http://localhost:8080/v1/auth/password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"current_password":"testpass1","new_password":"newpass123"}'
 
-# 6. Logout (revoke one refresh token)
+# 8. Logout (revoke one refresh token)
 curl -X POST http://localhost:8080/v1/auth/logout \
   -H "Content-Type: application/json" \
   -d "{\"refresh_token\":\"$REFRESH\"}"
 
-# 7. Logout all devices (JWT required)
+# 9. Logout all devices (JWT required)
 curl -X POST http://localhost:8080/v1/auth/logout-all \
   -H "Authorization: Bearer $TOKEN"
 
-# 8. Forgot password (returns reset_token in dev mode)
+# 10. Forgot password (sends reset link to email, expires 15 min)
 curl -X POST http://localhost:8080/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email":"t@t.com"}'
 
-# 9. Reset password (using token from step 8)
+# 11. Reset password (token from email link: /auth/reset-password?token=<token>)
 curl -X POST http://localhost:8080/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"token":"<reset_token>","new_password":"resetpass123"}'
 
-# 10. Get navigation menu config (JWT required)
+# 12. Get navigation menu config (JWT required)
 curl http://localhost:8080/v1/auth/menu-config \
   -H "Authorization: Bearer $TOKEN"
 
-# 11. Create order (JWT required)
+# 13. Create order (JWT required)
 curl -X POST http://localhost:8080/v1/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"customer_id":"c1","total_amount":50.00}'
 
-# 12. Check kitchen ticket
+# 14. Check kitchen ticket
 curl http://localhost:8080/v1/kitchen/status/1
 
-# 13. Create a catalog menu item (JWT required)
+# 15. Create a catalog menu item (JWT required)
 curl -X POST http://localhost:8080/v1/catalog/menus \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
