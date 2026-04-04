@@ -3,6 +3,7 @@ package repository
 import (
 	"auth-service/internal/model"
 	"gorm.io/gorm"
+	"time"
 )
 
 type UserRepository interface {
@@ -63,7 +64,12 @@ func (r *userRepository) UpdatePassword(id uint, hashedPassword string) error {
 }
 
 func (r *userRepository) UpdateIsVerified(id uint, isVerified bool) error {
-	return r.db.Model(&model.User{}).
-		Where("id = ?", id).
-		Update("is_verified", isVerified).Error
+	updates := map[string]any{"is_verified": isVerified}
+	if isVerified {
+		now := time.Now()
+		updates["verified_at"] = now
+	} else {
+		updates["verified_at"] = nil
+	}
+	return r.db.Model(&model.User{}).Where("id = ?", id).Updates(updates).Error
 }

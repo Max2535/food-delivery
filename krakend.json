@@ -990,6 +990,7 @@
       "endpoint": "/v1/auth/forgot-password",
       "method": "POST",
       "output_encoding": "no-op",
+      "timeout": "10s",
       "backend": [
         {
           "url_pattern": "/api/v1/auth/forgot-password",
@@ -1004,6 +1005,7 @@
       "endpoint": "/v1/auth/reset-password",
       "method": "POST",
       "output_encoding": "no-op",
+      "timeout": "10s",
       "backend": [
         {
           "url_pattern": "/api/v1/auth/reset-password",
