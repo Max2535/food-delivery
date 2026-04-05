@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 function VerifyEmailForm() {
@@ -14,6 +14,7 @@ function VerifyEmailForm() {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,8 +43,16 @@ function VerifyEmailForm() {
     }
   }
 
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
+
   async function handleResend() {
-    if (!email) return;
+    if (!email || resendCooldown > 0) return;
     setResendMessage("");
     setResendLoading(true);
 
@@ -54,6 +63,16 @@ function VerifyEmailForm() {
         body: JSON.stringify({ email }),
       });
       setResendMessage("ส่งรหัสยืนยันใหม่แล้ว กรุณาตรวจสอบอีเมลของคุณ");
+      setResendCooldown(60);
+      cooldownRef.current = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(cooldownRef.current!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch {
       setResendMessage("ไม่สามารถส่งอีเมลได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
@@ -143,16 +162,20 @@ function VerifyEmailForm() {
 
               <div className="mt-6 pt-5 border-t border-gray-100 space-y-3">
                 {email && (
-                  <div className="text-center">
+                  <div className="text-center space-y-2">
                     <button
                       onClick={handleResend}
-                      disabled={resendLoading}
-                      className="text-sm text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+                      disabled={resendLoading || resendCooldown > 0}
+                      className="w-full border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {resendLoading ? "กำลังส่ง..." : "ส่งรหัสยืนยันใหม่"}
+                      {resendLoading
+                        ? "กำลังส่ง..."
+                        : resendCooldown > 0
+                        ? `ส่งอีกครั้งได้ใน ${resendCooldown} วินาที`
+                        : "ส่งรหัสยืนยันใหม่"}
                     </button>
                     {resendMessage && (
-                      <p className="text-xs text-gray-500 mt-1">{resendMessage}</p>
+                      <p className="text-xs text-gray-500">{resendMessage}</p>
                     )}
                   </div>
                 )}

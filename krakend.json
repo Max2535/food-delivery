@@ -1035,6 +1035,7 @@
       "endpoint": "/v1/auth/resend-verification",
       "method": "POST",
       "output_encoding": "no-op",
+      "timeout":"10s",
       "backend": [
         {
           "url_pattern": "/api/v1/auth/resend-verification",

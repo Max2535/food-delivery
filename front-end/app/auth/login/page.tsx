@@ -2,19 +2,31 @@
 
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    setEmailNotVerified(false);
     setLoading(true);
 
     const res = await signIn("credentials", {
@@ -26,9 +38,8 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      console.log(res);
       if (res.code === "EMAIL_NOT_VERIFIED") {
-        router.push("/auth/verify-email");
+        setEmailNotVerified(true);
         return;
       }
       setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
@@ -36,6 +47,39 @@ export default function LoginPage() {
     }
 
     window.location.href = "/dashboard";
+  }
+
+  async function handleResend() {
+    if (!resendEmail || resendCooldown > 0) return;
+    setResendMessage("");
+    setResendLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+      if (res.ok) {
+        setResendMessage("ส่งอีเมลยืนยันใหม่แล้ว กรุณาตรวจสอบกล่องจดหมาย");
+      } else {
+        setResendMessage("ไม่พบอีเมลนี้ในระบบ หรือได้รับการยืนยันแล้ว");
+      }
+      setResendCooldown(60);
+      cooldownRef.current = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(cooldownRef.current!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch {
+      setResendMessage("ไม่สามารถส่งอีเมลได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   return (
@@ -61,6 +105,41 @@ export default function LoginPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {error}
+                </div>
+              )}
+
+              {emailNotVerified && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 space-y-3">
+                  <div className="flex items-start gap-2 text-amber-800 text-sm">
+                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    <span className="font-medium">อีเมลยังไม่ได้รับการยืนยัน กรุณากรอกอีเมลเพื่อรับลิงก์ยืนยันใหม่</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={resendEmail}
+                      onChange={(e) => setResendEmail(e.target.value)}
+                      className="flex-1 border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                      placeholder="อีเมลของคุณ"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={resendLoading || resendCooldown > 0 || !resendEmail}
+                      className="shrink-0 bg-amber-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {resendLoading
+                        ? "กำลังส่ง..."
+                        : resendCooldown > 0
+                        ? `${resendCooldown}s`
+                        : "ส่งอีกครั้ง"}
+                    </button>
+                  </div>
+                  {resendMessage && (
+                    <p className="text-xs text-amber-700">{resendMessage}</p>
+                  )}
                 </div>
               )}
 
