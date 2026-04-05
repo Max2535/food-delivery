@@ -232,6 +232,9 @@ func main() {
 	auth.Delete("/group/:id", authHandler.DeleteGroup)
 	auth.Get("/roles", authHandler.ListRoles)
 	auth.Get("/menu-config", authHandler.GetMenuConfig)
+	auth.Get("/users", authHandler.ListUsers)
+	auth.Put("/user", authHandler.UpdateUser)
+	auth.Delete("/user/:id", authHandler.DeleteUser)
 
 	port := os.Getenv("PORT")
 	if port == "" {

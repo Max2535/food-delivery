@@ -1,5 +1,9 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "EMAIL_NOT_VERIFIED";
+}
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
@@ -34,7 +38,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!res.ok) {
           const body = await res.json().catch(() => null);
           if (body?.code === "EMAIL_NOT_VERIFIED") {
-            throw new Error("EMAIL_NOT_VERIFIED");
+            throw new EmailNotVerifiedError();
           }
           return null;
         }

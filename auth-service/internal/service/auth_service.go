@@ -44,6 +44,9 @@ type AuthService interface {
 	UpdateGroup(id uint, name, description string, isActive bool, roleIDs []uint, userIDs []uint) (*model.Group, error)
 	DeleteGroup(id uint) error
 	GetMenuConfig(userID uint) ([]model.NavGroupResponse, error)
+	ListUsers() ([]model.User, error)
+	UpdateUserGroup(userID uint, groupID uint) error
+	DeleteUser(userID uint) error
 }
 
 type authService struct {
@@ -449,4 +452,27 @@ func hashToken(token string) string {
 func isDuplicateError(err error) bool {
 	return strings.Contains(err.Error(), "duplicate key") ||
 		strings.Contains(err.Error(), "SQLSTATE 23505")
+}
+
+func (s *authService) ListUsers() ([]model.User, error) {
+	return s.userRepo.ListAll()
+}
+
+func (s *authService) UpdateUserGroup(userID uint, groupID uint) error {
+	_, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	if _, err := s.groupRepo.FindByID(groupID); err != nil {
+		return ErrGroupNotFound
+	}
+	return s.userRepo.UpdateGroupID([]uint{userID}, groupID)
+}
+
+func (s *authService) DeleteUser(userID uint) error {
+	_, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	return s.userRepo.Delete(userID)
 }

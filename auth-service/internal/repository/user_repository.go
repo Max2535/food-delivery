@@ -12,9 +12,11 @@ type UserRepository interface {
 	FindByEmail(email string) (*model.User, error)
 	FindByID(id uint) (*model.User, error)
 	FindByIDs(ids []uint) ([]model.User, error)
+	ListAll() ([]model.User, error)
 	UpdatePassword(id uint, hashedPassword string) error
 	UpdateGroupID(userIDs []uint, groupID uint) error
 	UpdateIsVerified(id uint, isVerified bool) error
+	Delete(id uint) error
 }
 
 type userRepository struct {
@@ -72,4 +74,14 @@ func (r *userRepository) UpdateIsVerified(id uint, isVerified bool) error {
 		updates["verified_at"] = nil
 	}
 	return r.db.Model(&model.User{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (r *userRepository) ListAll() ([]model.User, error) {
+	var users []model.User
+	err := r.db.Preload("Group").Find(&users).Error
+	return users, err
+}
+
+func (r *userRepository) Delete(id uint) error {
+	return r.db.Delete(&model.User{}, id).Error
 }

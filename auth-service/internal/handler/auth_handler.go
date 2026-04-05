@@ -97,12 +97,14 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	pair, err := h.authService.Login(req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
+			log.Warn().Str("correlation_id", correlationID).Str("username", req.Username).Msg("invalid login attempt")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid username or password"})
 		}
 		if errors.Is(err, service.ErrEmailNotVerified) {
+			log.Warn().Str("correlation_id", correlationID).Str("username", req.Username).Msg("login attempt with unverified email")
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "email not verified", "code": "EMAIL_NOT_VERIFIED"})
 		}
-		log.Error().Str("correlation_id", correlationID).Err(err).Msg("login failed")
+		log.Error().Str("correlation_id", correlationID).Str("username", req.Username).Err(err).Msg("login failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
@@ -639,6 +641,119 @@ func (h *AuthHandler) DeleteGroup(c *fiber.Ctx) error {
 
 	log.Info().Str("correlation_id", correlationID).Uint64("group_id", id).Msg("group deleted")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "group deleted successfully"})
+}
+
+// ListUsers godoc
+// @Summary List users
+// @Description Get all users with their group info
+// @Tags auth
+// @Produce json
+// @Success 200 {object} object{users=[]object{id=int,username=string,email=string,group_id=int,group=string,is_verified=bool,created_at=string}}
+// @Failure 500 {object} object{error=string}
+// @Router /api/v1/auth/users [get]
+func (h *AuthHandler) ListUsers(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	users, err := h.authService.ListUsers()
+	if err != nil {
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("list users failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	type userResp struct {
+		ID         uint   `json:"id"`
+		Username   string `json:"username"`
+		Email      string `json:"email"`
+		GroupID    uint   `json:"group_id"`
+		Group      string `json:"group"`
+		IsVerified bool   `json:"is_verified"`
+		CreatedAt  string `json:"created_at"`
+	}
+
+	result := make([]userResp, len(users))
+	for i, u := range users {
+		result[i] = userResp{
+			ID:         u.ID,
+			Username:   u.Username,
+			Email:      u.Email,
+			GroupID:    u.GroupID,
+			Group:      u.Group.Name,
+			IsVerified: u.IsVerified,
+			CreatedAt:  u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"users": result})
+}
+
+// UpdateUser godoc
+// @Summary Update user group
+// @Description Change a user's group assignment
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object{user_id=int,group_id=int} true "User update"
+// @Success 200 {object} object{message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /api/v1/auth/user [put]
+func (h *AuthHandler) UpdateUser(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	var req struct {
+		UserID  uint `json:"user_id"`
+		GroupID uint `json:"group_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.UserID == 0 || req.GroupID == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "user_id and group_id are required"})
+	}
+
+	if err := h.authService.UpdateUserGroup(req.UserID, req.GroupID); err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+		}
+		if errors.Is(err, service.ErrGroupNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "group not found"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("update user failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint("user_id", req.UserID).Uint("group_id", req.GroupID).Msg("user group updated")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user updated successfully"})
+}
+
+// DeleteUser godoc
+// @Summary Delete user
+// @Description Soft-delete a user by ID
+// @Tags auth
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} object{message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /api/v1/auth/user/{id} [delete]
+func (h *AuthHandler) DeleteUser(c *fiber.Ctx) error {
+	correlationID := c.Locals("correlationID").(string)
+
+	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user ID"})
+	}
+
+	if err := h.authService.DeleteUser(uint(id)); err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+		}
+		log.Error().Str("correlation_id", correlationID).Err(err).Msg("delete user failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	log.Info().Str("correlation_id", correlationID).Uint64("user_id", id).Msg("user deleted")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user deleted successfully"})
 }
 
 // GetMenuConfig godoc

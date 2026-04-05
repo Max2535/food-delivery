@@ -116,9 +116,9 @@ var DefaultNavMenuSeed = []SeedNavGroup{
 		Label:       "Auth",
 		Permissions: []string{PermAuthGroupsView, PermAuthRolesView, PermAuthUsersView},
 		Items: []SeedNavItem{
-			{Label: "กลุ่ม", Href: "/dashboard/groups", Permissions: []string{PermAuthGroupsView}},
-			{Label: "สิทธิ์", Href: "/dashboard/roles", Permissions: []string{PermAuthRolesView}},
-			{Label: "ผู้ใช้", Href: "/dashboard/users", Permissions: []string{PermAuthUsersView}},
+			{Label: "กลุ่ม", Href: "/dashboard/auth/groups", Permissions: []string{PermAuthGroupsView}},
+			{Label: "สิทธิ์", Href: "/dashboard/auth/roles", Permissions: []string{PermAuthRolesView}},
+			{Label: "ผู้ใช้", Href: "/dashboard/auth/users", Permissions: []string{PermAuthUsersView}},
 		},
 	},
 	{

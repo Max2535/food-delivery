@@ -2,23 +2,19 @@
 
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [emailNotVerified, setEmailNotVerified] = useState(false);
-  const [resendEmail, setResendEmail] = useState("");
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendMessage, setResendMessage] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    setEmailNotVerified(false);
-    setResendMessage("");
     setLoading(true);
 
     const res = await signIn("credentials", {
@@ -30,8 +26,9 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      if (res.error.includes("EMAIL_NOT_VERIFIED")) {
-        setEmailNotVerified(true);
+      console.log(res);
+      if (res.code === "EMAIL_NOT_VERIFIED") {
+        router.push("/auth/verify-email");
         return;
       }
       setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
@@ -39,29 +36,6 @@ export default function LoginPage() {
     }
 
     window.location.href = "/dashboard";
-  }
-
-  async function handleResend(e: FormEvent) {
-    e.preventDefault();
-    setResendMessage("");
-    setResendLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/resend-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resendEmail }),
-      });
-      if (res.ok) {
-        setResendMessage("ส่งลิงก์ยืนยันใหม่แล้ว กรุณาตรวจสอบอีเมลของคุณ");
-      } else {
-        setResendMessage("ไม่พบอีเมลนี้ในระบบ กรุณาตรวจสอบอีกครั้ง");
-      }
-    } catch {
-      setResendMessage("ไม่สามารถส่งอีเมลได้ กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setResendLoading(false);
-    }
   }
 
   return (
@@ -80,75 +54,8 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          {emailNotVerified ? (
-            /* Email not verified state */
-            <div className="space-y-5">
-              <div className="flex flex-col items-center text-center gap-3">
-                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
-                  <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">อีเมลยังไม่ได้รับการยืนยัน</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ ตรวจสอบกล่องจดหมายของคุณ<br />หรือขอรับลิงก์ยืนยันใหม่ด้านล่าง
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                href="/auth/verify-email"
-                className="block w-full bg-primary-600 text-white py-2.5 rounded-xl font-medium hover:bg-primary-700 transition-colors shadow-sm text-center text-sm"
-              >
-                ไปยืนยันอีเมล
-              </Link>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100" />
-                </div>
-                <div className="relative flex justify-center text-xs text-gray-400">
-                  <span className="bg-white px-2">หรือขอรับลิงก์ยืนยันใหม่</span>
-                </div>
-              </div>
-
-              <form onSubmit={handleResend} className="space-y-3">
-                <input
-                  type="email"
-                  required
-                  value={resendEmail}
-                  onChange={(e) => setResendEmail(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
-                  placeholder="กรอกอีเมลของคุณ"
-                />
-                <button
-                  type="submit"
-                  disabled={resendLoading}
-                  className="w-full border border-primary-600 text-primary-600 py-2.5 rounded-xl font-medium hover:bg-primary-50 disabled:opacity-50 transition-colors text-sm"
-                >
-                  {resendLoading ? "กำลังส่ง..." : "ส่งลิงก์ยืนยันใหม่"}
-                </button>
-                {resendMessage && (
-                  <p className={`text-xs text-center ${resendMessage.includes("ส่งลิงก์") ? "text-green-600" : "text-red-500"}`}>
-                    {resendMessage}
-                  </p>
-                )}
-              </form>
-
-              <p className="text-center text-sm">
-                <button
-                  onClick={() => { setEmailNotVerified(false); setResendMessage(""); }}
-                  className="text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  กลับไปหน้าเข้าสู่ระบบ
-                </button>
-              </p>
-            </div>
-          ) : (
-            /* Normal login form */
-            <>
-              {error && (
+          <>
+            {error && (
                 <div className="flex items-center gap-2 bg-red-50 text-red-600 p-3 rounded-xl mb-5 text-sm border border-red-100">
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -220,8 +127,7 @@ export default function LoginPage() {
                   </Link>
                 </p>
               </div>
-            </>
-          )}
+          </>
         </div>
       </div>
     </div>
