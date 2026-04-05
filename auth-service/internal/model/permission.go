@@ -13,10 +13,12 @@ const (
 	PermAuthUsersManage  = "auth.users.manage"
 
 	// Catalog
-	PermCatalogMenusView        = "catalog.menus.view"
-	PermCatalogMenusManage      = "catalog.menus.manage"
-	PermCatalogIngredientsView  = "catalog.ingredients.view"
+	PermCatalogMenusView         = "catalog.menus.view"
+	PermCatalogMenusManage       = "catalog.menus.manage"
+	PermCatalogIngredientsView   = "catalog.ingredients.view"
 	PermCatalogIngredientsManage = "catalog.ingredients.manage"
+	PermCatalogStationsView      = "catalog.stations.view"
+	PermCatalogStationsManage    = "catalog.stations.manage"
 
 	// Kitchen
 	PermKitchenView   = "kitchen.view"
@@ -72,6 +74,7 @@ var RolePermissions = map[string][]string{
 		PermAuthUsersView, PermAuthUsersManage,
 		PermCatalogMenusView, PermCatalogMenusManage,
 		PermCatalogIngredientsView, PermCatalogIngredientsManage,
+		PermCatalogStationsView, PermCatalogStationsManage,
 		PermKitchenView, PermKitchenManage,
 		PermOrdersView, PermOrdersManage, PermOrdersCreate, PermQueueView,
 		PermInventoryView, PermInventoryManage,
@@ -79,6 +82,7 @@ var RolePermissions = map[string][]string{
 	RoleMerchant: {
 		PermCatalogMenusView, PermCatalogMenusManage,
 		PermCatalogIngredientsView, PermCatalogIngredientsManage,
+		PermCatalogStationsView, PermCatalogStationsManage,
 		PermKitchenView, PermKitchenManage,
 		PermOrdersView, PermOrdersManage, PermQueueView,
 		PermInventoryView, PermInventoryManage,

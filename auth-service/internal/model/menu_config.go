@@ -125,8 +125,9 @@ var DefaultNavMenuSeed = []SeedNavGroup{
 		Label:       "Catalog",
 		Permissions: []string{PermCatalogMenusView, PermCatalogIngredientsView},
 		Items: []SeedNavItem{
-			{Label: "เมนู", Href: "/dashboard/menus", Permissions: []string{PermCatalogMenusView}},
-			{Label: "วัตถุดิบ (BOM)", Href: "/dashboard/ingredients", Permissions: []string{PermCatalogIngredientsView}},
+			{Label: "จัดการเมนู", Href: "/dashboard/catalog/menus", Permissions: []string{PermCatalogMenusView}},
+			{Label: "จัดการวัตถุดิบ (BOM)", Href: "/dashboard/catalog/ingredients", Permissions: []string{PermCatalogIngredientsView}},
+			{Label: "จัดการครัว", Href: "/dashboard/catalog/stations", Permissions: []string{PermCatalogStationsView}},
 		},
 	},
 	{
