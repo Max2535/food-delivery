@@ -100,7 +100,9 @@ export default function MenusPage() {
   const [bom, setBom] = useState<BOMItem[]>([]);
   const [bomLoading, setBomLoading] = useState(false);
   const [showAddBom, setShowAddBom] = useState(false);
+  const [bomType, setBomType] = useState<"ingredient" | "sub_menu">("ingredient");
   const [bomIngredientId, setBomIngredientId] = useState("");
+  const [bomSubMenuId, setBomSubMenuId] = useState("");
   const [bomQuantity, setBomQuantity] = useState("");
   const [addingBom, setAddingBom] = useState(false);
 
@@ -157,11 +159,11 @@ export default function MenusPage() {
       .then(async ([menusRes, ingredientsRes]) => {
         if (menusRes.ok) {
           const j = await menusRes.json();
-          setMenus(Array.isArray(j) ? j : j.data ?? []);
+          setMenus(Array.isArray(j) ? j : j.menu_items ?? j.data ?? []);
         }
         if (ingredientsRes.ok) {
           const j = await ingredientsRes.json();
-          setIngredients(Array.isArray(j) ? j : j.data ?? []);
+          setIngredients(Array.isArray(j) ? j : j.ingredients ?? j.data ?? []);
         }
       })
       .catch((err) => { if (err.name !== "AbortError") console.error(err); });
@@ -178,7 +180,7 @@ export default function MenusPage() {
       setBomLoading(true);
       fetch(`/api/catalog/menus/${selectedMenu.id}/bom`, { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
-        .then((j) => setBom(Array.isArray(j) ? j : j.data ?? []))
+        .then((j) => setBom(Array.isArray(j) ? j : j.bom_items ?? []))
         .catch(console.error)
         .finally(() => setBomLoading(false));
     }
@@ -276,6 +278,8 @@ export default function MenusPage() {
         if (selectedMenu?.id === saved.id) setSelectedMenu(saved);
       } else {
         setMenus((prev) => [...prev, saved]);
+        setSelectedMenu(saved);
+        setActiveTab("bom");
       }
       setShowModal(false);
     } catch (err) { console.error(err); alert("เกิดข้อผิดพลาด"); }
@@ -307,20 +311,28 @@ export default function MenusPage() {
     setSelectedMenu(menu);
     setActiveTab("bom");
     setShowAddBom(false); setShowAddAddon(false); setShowAddGroup(false); setShowAddPortion(false);
-    setAddingOptionToGroup(null);
+    setAddingOptionToGroup(null); setBomType("ingredient"); setBomSubMenuId("");
   }
 
   // ─── BOM handlers ────────────────────────────────────────────
   async function handleAddBom(e: FormEvent) {
     e.preventDefault();
-    if (!selectedMenu || !bomIngredientId || !bomQuantity || addingBom) return;
+    if (!selectedMenu || !bomQuantity || addingBom) return;
+    if (bomType === "ingredient" && !bomIngredientId) return;
+    if (bomType === "sub_menu" && !bomSubMenuId) return;
     setAddingBom(true);
     try {
-      const res = await fetch(`/api/catalog/menus/${selectedMenu.id}/bom`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ ingredient_id: Number(bomIngredientId), quantity: parseFloat(bomQuantity) }) });
+      const payload: Record<string, unknown> = { quantity: parseFloat(bomQuantity) };
+      if (bomType === "ingredient") {
+        payload.ingredient_id = Number(bomIngredientId);
+      } else {
+        payload.sub_menu_item_id = Number(bomSubMenuId);
+      }
+      const res = await fetch(`/api/catalog/menus/${selectedMenu.id}/bom`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       if (!res.ok) { const err = await res.json().catch(() => null); alert("เพิ่ม BOM ไม่สำเร็จ: " + (err?.message ?? res.statusText)); return; }
       const json = await res.json();
       setBom((prev) => [...prev, json.data ?? json]);
-      setBomIngredientId(""); setBomQuantity(""); setShowAddBom(false);
+      setBomIngredientId(""); setBomSubMenuId(""); setBomQuantity(""); setShowAddBom(false);
     } catch (err) { console.error(err); alert("เกิดข้อผิดพลาด"); }
     finally { setAddingBom(false); }
   }
@@ -542,11 +554,24 @@ export default function MenusPage() {
                           {bom.map((item) => (
                             <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
                               <div>
-                                <p className="text-sm font-medium text-gray-700">
-                                  {item.ingredient?.name ?? ingredientName(item.ingredient_id)}
-                                  {item.sub_menu_item && <span className="text-blue-600"> [{item.sub_menu_item.name}]</span>}
-                                </p>
-                                <p className="text-xs text-gray-400">{item.quantity} {item.ingredient?.unit ?? ingredientUnit(item.ingredient_id)}</p>
+                                {item.sub_menu_item_id ? (
+                                  <>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">เมนูย่อย</span>
+                                      <p className="text-sm font-medium text-blue-700">
+                                        {item.sub_menu_item?.name ?? menus.find((m) => m.id === item.sub_menu_item_id)?.name ?? `เมนู #${item.sub_menu_item_id}`}
+                                      </p>
+                                    </div>
+                                    <p className="text-xs text-gray-400">x{item.quantity}</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-sm font-medium text-gray-700">
+                                      {item.ingredient?.name ?? ingredientName(item.ingredient_id)}
+                                    </p>
+                                    <p className="text-xs text-gray-400">{item.quantity} {item.ingredient?.unit ?? ingredientUnit(item.ingredient_id)}</p>
+                                  </>
+                                )}
                               </div>
                               <button onClick={() => handleDeleteBom(item.id)} className="text-xs text-red-500 hover:text-red-700">ลบ</button>
                             </div>
@@ -555,24 +580,42 @@ export default function MenusPage() {
                       )}
                       {showAddBom ? (
                         <form onSubmit={handleAddBom} className="border-t pt-4 space-y-3">
-                          <p className="text-sm font-medium text-gray-600">เพิ่มวัตถุดิบ</p>
-                          <select value={bomIngredientId} onChange={(e) => setBomIngredientId(e.target.value)}
-                            className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            <option value="">เลือกวัตถุดิบ...</option>
-                            {ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>)}
-                          </select>
+                          <p className="text-sm font-medium text-gray-600">เพิ่มส่วนประกอบ BOM</p>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => { setBomType("ingredient"); setBomSubMenuId(""); }}
+                              className={`flex-1 py-1.5 rounded text-sm font-medium transition ${bomType === "ingredient" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                              วัตถุดิบ
+                            </button>
+                            <button type="button" onClick={() => { setBomType("sub_menu"); setBomIngredientId(""); }}
+                              className={`flex-1 py-1.5 rounded text-sm font-medium transition ${bomType === "sub_menu" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                              เมนูย่อย (Sub-recipe)
+                            </button>
+                          </div>
+                          {bomType === "ingredient" ? (
+                            <select value={bomIngredientId} onChange={(e) => setBomIngredientId(e.target.value)}
+                              className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                              <option value="">เลือกวัตถุดิบ...</option>
+                              {ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>)}
+                            </select>
+                          ) : (
+                            <select value={bomSubMenuId} onChange={(e) => setBomSubMenuId(e.target.value)}
+                              className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                              <option value="">เลือกเมนูย่อย...</option>
+                              {menus.filter((m) => m.id !== selectedMenu?.id).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                          )}
                           <div className="flex gap-2">
                             <input type="number" step="0.001" min="0.001" placeholder="ปริมาณ" value={bomQuantity} onChange={(e) => setBomQuantity(e.target.value)}
                               className="flex-1 border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                             <button type="submit" disabled={addingBom} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition">เพิ่ม</button>
-                            <button type="button" onClick={() => { setShowAddBom(false); setBomIngredientId(""); setBomQuantity(""); }}
+                            <button type="button" onClick={() => { setShowAddBom(false); setBomIngredientId(""); setBomSubMenuId(""); setBomQuantity(""); setBomType("ingredient"); }}
                               className="px-3 py-1.5 rounded text-sm text-gray-600 hover:bg-gray-100 transition">ยกเลิก</button>
                           </div>
                         </form>
                       ) : (
                         <button onClick={() => setShowAddBom(true)}
                           className="w-full mt-2 border-2 border-dashed border-gray-200 rounded-lg py-2 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition">
-                          + เพิ่มวัตถุดิบ
+                          + เพิ่มส่วนประกอบ BOM
                         </button>
                       )}
                     </>

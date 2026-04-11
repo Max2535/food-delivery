@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const authHeader = req.headers.get("authorization") || "";
 
-  const res = await fetch(`${API_URL}/v1/catalog/menus/${params.id}`, {
+  const res = await fetch(`${API_URL}/v1/catalog/menus/${id}`, {
     headers: { Authorization: authHeader },
   });
 
@@ -13,11 +14,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(data ?? { message: "Unknown error" }, { status: res.status });
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const authHeader = req.headers.get("authorization") || "";
   const body = await req.json();
 
-  const res = await fetch(`${API_URL}/v1/catalog/menus/${params.id}`, {
+  const res = await fetch(`${API_URL}/v1/catalog/menus/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: authHeader },
     body: JSON.stringify(body),
@@ -27,10 +29,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(data ?? { message: "Unknown error" }, { status: res.status });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const authHeader = req.headers.get("authorization") || "";
 
-  const res = await fetch(`${API_URL}/v1/catalog/menus/${params.id}`, {
+  const res = await fetch(`${API_URL}/v1/catalog/menus/${id}`, {
     method: "DELETE",
     headers: { Authorization: authHeader },
   });

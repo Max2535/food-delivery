@@ -4,11 +4,12 @@ const API_URL = process.env.API_URL || "http://localhost:8080";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; bom_id: string } }
+  { params }: { params: Promise<{ id: string; bom_id: string }> }
 ) {
+  const { id, bom_id } = await params;
   const authHeader = req.headers.get("authorization") || "";
 
-  const res = await fetch(`${API_URL}/v1/catalog/menus/${params.id}/bom/${params.bom_id}`, {
+  const res = await fetch(`${API_URL}/v1/catalog/menus/${id}/bom/${bom_id}`, {
     method: "DELETE",
     headers: { Authorization: authHeader },
   });
